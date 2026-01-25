@@ -99,6 +99,42 @@ namespace leo{
 
 				return result;
 			}
+
+			T Method_Laplas(const matrix<T> A){
+				if (A.size_col() != A.size_row()) std::invalid_argument("Size of column and row not eqvel!");	
+				T DET = 0;
+				if (A.size() != 4) {
+					for(size_t j=0; j < A.size_col(); ++j){
+
+						matrix<T> M(A.size_row() - 1, A.size_col() - 1);
+						size_t l=0;
+						for(size_t k=0; k < A.size_col(); ++k){
+							if (k != j){
+								for(size_t n=1; n < A.size_row(); ++n){
+										M[n-1][l] = A[n][k];
+								}
+								l++;
+							}
+						}
+						
+						T ELEM = Method_Laplas(M);
+						int cof = 1;
+						if ( (j + 2) % 2 != 0 ) cof = -1; 
+						DET += cof * A[0][j] * ELEM;
+					}
+					return DET;
+				}
+				
+
+				DET = A[0][0] * A[1][1] - A[0][1] * A[1][0];
+				return DET;
+			}
+
+
+			T det(){
+				return Method_Laplas(MATRIX);
+			}
+
 			
 
 		friend matrix<T> operator+(const matrix<T>& a, const matrix<T>& b);

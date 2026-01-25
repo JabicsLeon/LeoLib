@@ -90,9 +90,9 @@ namespace leo{
 			}
 
 			matrix<T> transposition(){
-				matrix<T> result(row, col);
-				for(size_t i=0; i < row; ++i){
-					for(size_t j=0; j < col; ++j){
+				matrix<T> result(col, row);
+				for(size_t i=0; i < col; ++i){
+					for(size_t j=0; j < row; ++j){
 						result[i][j] = MATRIX[j][i];
 					}
 				}

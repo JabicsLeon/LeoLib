@@ -24,6 +24,11 @@ namespace leo{
 
 	tempalte<class T, class B>
 	class<T> matrix{
+		friend matrix<T> operator+(const matrix<T>& a, const matrix<T>& b);
+		friend matrix<T> operator+(const matrix<T>& a, T b);
+		friend matrix<T> operator+(T b, const matrix<T>& a);
+		friend matrix<T> operator*(const matrix<T>& a, T b);
+		friend matrix<T> operator*(T b, const matrix<T>& a);
 		private:
 			std::vector<std::vector<T>> MATRIX;
 			size_t col, row, mat;
@@ -100,6 +105,7 @@ namespace leo{
 				return result;
 			}
 
+
 			T Method_Laplas(const matrix<T> A){
 				if (A.size_col() != A.size_row()) std::invalid_argument("Size of column and row not eqvel!");	
 				T DET = 0;
@@ -136,12 +142,51 @@ namespace leo{
 			}
 
 			
+			 T algadd(size_t a, size_t b){
+				if ( a >= row ) std::invalid_argument("Row index out of range")
+				if ( b >= col ) std::invalid_argument("Column index out of range")
 
-		friend matrix<T> operator+(const matrix<T>& a, const matrix<T>& b);
-		friend matrix<T> operator+(const matrix<T>& a, T b);
-		friend matrix<T> operator+(T b, const matrix<T>& a);
-		friend matrix<T> operator*(const matrix<T>& a, T b);
-		friend matrix<T> operator*(T b, const matrix<T>& a);
+				matrix<T> A(row - 1, col - 1);
+				k = 0;
+				n = 0;
+				for(size_t i=0; i < row; ++i){
+					if( i!=a ){
+						for(size_t j=0; j < col; ++j){
+							if( j!=b){
+								A[k][n] = MATRIX[i][j];
+								n++;
+							}
+						}
+						k++;
+					}
+				}
+
+				T result = A.det();
+				if ( (i + j + 2) % 2 != 0 ) result *= -1;
+				
+				return result;
+			}
+
+			matrix<T> algadd(){
+				matrix<T> A(row, col)
+				for(size_t i=0; i < row; ++i){
+					for(size_t j=0; j < col; ++j){
+						A[i][j] = algadd(i, j);
+					}
+				}
+				
+				return A;
+			}
+
+			matrix<T> attached(){
+				return this.algadd().transposition();
+			}
+			
+			matrix<T> inverse(){
+				return (1 / det()) * attached()
+			}
+			
+
 	}
 
 	template<class T>

@@ -39,6 +39,10 @@ namespace leo{
 			matrix<T> (size_t r, size_t c) : row(r), col(c) {
 				MATRIX.resize(row, std::vector<T>(col, 0));
 				mat = row * col;
+				HEAD.resize(col);
+				LABELS.resize[2];
+				LABELS[0].resize(row);
+				LABELS[1].resize(col);
 			}
 
 			std::vector<T>& operator[](size_t r){
@@ -68,7 +72,71 @@ namespace leo{
 
 			size_t size() { return mat; }
 			
-			std::vector<T> operator()(const std::vector<B>& vec) const {
+
+			void resize(size_t nrow, size_t ncol){
+				MATRIX.resize(nrow, 0);
+				row = nrow;
+				for (size_t i=0; i < row; ++i){
+					MATRIiX[i].resize(ncol, 0);
+				}
+				col = ncol;
+			}
+
+			void swap_row(size_t a, size_t b){
+				if ( a >= row ||  b >= row ) std::invalid_argument("Row index out of range");
+
+				std::swap(MATRIX[a], MATRIX[b]);
+			}
+
+			void swap_col(size_t a, size_t b){
+				if ( a >= col ||  b >= col ) std::invalid_argument("Column index out of range");
+				
+				for(size_t i=0; i < row; ++i){
+					std::swap(MATRIX[i][a], MATRIX[i][a][b]);
+				}
+			}
+
+			void erase_row(size_t a){
+				if ( a >= row ) std::invalid_argument("Row index out of range");
+				
+				MATRIX.erase(MATRIX.begin() + a);
+				row -= 1;
+			}
+			
+			void erase_row(size_t a, size_t b){
+				if ( a >= row ||  b >= row ) std::invalid_argument("Row index out of range");
+				
+				MATRIX.erase(MATRIX.begin() + a, MATRIX.begin() + b);
+				row -= b - a;
+			}
+
+			void erase_col(size_t a){
+				if ( a >= col ) std::invalid_argument("Column index out of range");
+
+				for(size_t i=0; i < row; ++i){
+					MATRIX[i].erase(MATRIX[i].begin() + a);
+				}
+				col -= 1;
+			}
+
+			void erase_col(size_t a,  size_t b){
+				if ( a >= col ||  b >= col ) std::invalid_argument("Column index out of range");
+
+				for(size_t i=0; i < row; ++i){
+					MATRIX[i].erase(MATRIX[i].begin() + a, MATRIX[i].begin() + b);
+				}
+				col -= b - a;
+			}
+
+			void erase(size_t drow, size_t dcol){
+				if ( drow >= row ) std::invalid_argument("Row index out of range");
+				if ( dcol >= col ) std::invalid_argument("Column index out of range");
+					
+				erase_row(drow);
+				erase_col(dcol);
+			}
+
+			std::vector<T> operator()(const std::vector<T>& vec) const {
 				if (vec.size() != col) throw std::invalid_argument("Size of vector and number of columns from matrix not eqvel!");
 				
 				std::vector<T> result(row, 0);
@@ -80,12 +148,12 @@ namespace leo{
 				return result;
 			}
 
-			matrix<T> operator()(const matrix<B>& m){
-				if( col != m.size(SM:row) ) std::invalid_argument("Size of column in left matrix and size of rows in right matrix not eqvel!");
+			matrix<T> operator()(const matrix<T>& m){
+				if( col != m.size_row() ) std::invalid_argument("Size of column in left matrix and size of rows in right matrix not eqvel!");
 				
-				matrix<T> result(row, m.size(MS::col));
+				matrix<T> result(row, m.size_col());
 				for(size_t i=0; i < row; ++i){
-					for(size_t j=0; j < m.size(MS::col); ++j){
+					for(size_t j=0; j < m.size_col(); ++j){
 						for(size_t k; k < col; ++k){
 							result[i][j] += MATRIX[i][k] * m[k][j]
 						}
@@ -106,24 +174,15 @@ namespace leo{
 			}
 
 
-			T Method_Laplas(const matrix<T> A){
+			T Method_Laplas(const matrix<T>& A){
 				if (A.size_col() != A.size_row()) std::invalid_argument("Size of column and row not eqvel!");	
 				T DET = 0;
 				if (A.size() != 4) {
 					for(size_t j=0; j < A.size_col(); ++j){
-
-						matrix<T> M(A.size_row() - 1, A.size_col() - 1);
-						size_t l=0;
-						for(size_t k=0; k < A.size_col(); ++k){
-							if (k != j){
-								for(size_t n=1; n < A.size_row(); ++n){
-										M[n-1][l] = A[n][k];
-								}
-								l++;
-							}
-						}
 						
-						T ELEM = Method_Laplas(M);
+						matrix<T> M = A;
+						M.erase(0, j);
+
 						int cof = 1;
 						if ( (j + 2) % 2 != 0 ) cof = -1; 
 						DET += cof * A[0][j] * ELEM;
@@ -138,7 +197,7 @@ namespace leo{
 
 
 			T det(){
-				return Method_Laplas(MATRIX);
+				return Method_Laplas(this);
 			}
 
 			
@@ -146,20 +205,8 @@ namespace leo{
 				if ( a >= row ) std::invalid_argument("Row index out of range")
 				if ( b >= col ) std::invalid_argument("Column index out of range")
 
-				matrix<T> A(row - 1, col - 1);
-				k = 0;
-				n = 0;
-				for(size_t i=0; i < row; ++i){
-					if( i!=a ){
-						for(size_t j=0; j < col; ++j){
-							if( j!=b){
-								A[k][n] = MATRIX[i][j];
-								n++;
-							}
-						}
-						k++;
-					}
-				}
+				matrix<T> A = this;
+				A.erase(a, b);
 
 				T result = A.det();
 				if ( (i + j + 2) % 2 != 0 ) result *= -1;

@@ -15,7 +15,150 @@
 #include <map>
 #include <string>
 
+namespace leo{
+	template<T> class matrix;
 
+	template<T>
+	class matrix<T>::iterator {
+	privet:
+		matrix<T>* mat;
+		size_t index;
+	public:
+		using iterator_category = std::random_access_iterator_tag;
+		using value_type = T;
+		using difference_type = std::ptrdiff_t;
+		using pointer = T*;
+		using reference = T&;
+
+		iterator(matrix<T>* m, size_t idx=0) : mat(m), index(idx) {}
+
+		reference operator*() {
+			size_t row = index / mat->col;
+			size_t col = index % mat->col;
+			return (*mat)[row][col];
+		}
+
+		pointer operator->() {
+			size_t row = index / mat->col;
+			size_t col = index % mat->col;
+			return &(*mat)[row][col];
+		}
+
+		iterator& operator++() { ++index; return *this; }
+		iterator operator++(int) { iterator tmp = *this; ++index; return tmp; }
+		iterator& operator--() {--index; return *this; }
+		iterator operator--(int)  { iterator tmp = *this; --index; return tmp; }
+		
+		iterator& operator+=(difference_type n) { index += n; return *this; }
+		iterator& operator-=(difference_type n) { index -= n; return *this; }
+
+		friend iterator operator+(iterator it, difference_type n) { return iterator(it.mat, it.index + n); }
+		friend iterator operator+(difference_type n, iterator it) { return it + n; }
+		friend iterator operator-(iterator it, difference_type n) { return iterator(it.mat, it.index - n); }
+		friend difference_type operator-(const iterator& a, const iterator& b) { return a.index - b.index;  }
+		
+		reference operator[](difference_type n) const { return *(*this + n); }
+
+		bool operator==(const iterator& other) const { return index == other.index && mat == other.mat; }
+		bool operator!=(const iterator& other) const { return !(*this == other);
+		bool operator<(const iterator& other) const { return index < other.index; }
+		bool operator>(const iterator& other) const { return index > other.index; }
+		bool operator<=(const iterator& other) const { return index <= other.index; }
+		bool operator>=(const iterator& other) const { return index >= other.index; }
+	};
+
+
+	template<T>	
+	class matrix<T>::row_iterator{
+	privet:
+		matrix<T>* mat;
+		size_t row_index;
+	public:
+		using iterator_category = std::random_access_iterator_tag;
+		using value_type = std::vector<T>;
+		using difference_type = std::ptrdiff_t;
+		using pointer = std::vector<T>*;
+		using reference = std::vector<T>&;
+
+		row_iterator(matrix<T>* m, size_t row_idx = 0) : mat(m), row_index(row_idx){}
+
+		reference operator*() {
+			return (*mat)[row_index];
+		}
+
+		pointer operator->() {
+			return &(*mat)[row_index];
+		}
+
+		row_iterator& operator++() { ++row_index; return *this; }
+		row_iterator operator++(int) { row_iterator tmp = *this; ++row_index; return tmp; }
+		row_iterator& operator--() { --row_index; return *this; }
+		row_iterator operator--(int) { row_iterator tmp = *this; --row_index; return tmp; }
+		
+		row_iterator& operator+=(difference_type n) { row_index += n; return *this; }
+		row_iterator& operator-=(difference_type n) { row_index -= n; return *this; }
+
+		friend row_iterator operator+(row_iterator it, difference_type n) { return row_iterator(it.mat, it.row_index + n); }
+		friend row_iterator operator+(difference_type n, row_iterator it) { return it + n; }
+		friend row_iterator operator-(row_iterator it, difference_type n) { return iterator(it.mat, it.row_index - n); }
+		friend difference_type operator-(const row_iterator& a, const row_iterator& b) { return a.row_index - b.row_index; }
+		
+		bool operator==(const row_iterator& other) const { return row_index == other.row_index && mat == other.mat; }
+		bool operator!=(const row_iterator& other) const { return !(*this == other); }
+
+	};
+
+	
+	template<class T>
+	class matrix<T>::column_iterator {
+	privet:
+		matrix<T>* mat;
+		size_t col_index;
+		size_t row_index;
+	public:
+		using iterator_category = std::forward_iterator_tag;
+		using value_type = T;
+		using difference_type = std::ptrdiff_t;
+		using pointer = T*;
+		using reference = T&;
+
+		column_iterator(matrix<T>* m, size_t col_idx, row_idx = 0) : mat(m), col_indnx(col_idx), row_index(row_idx) {}
+
+		reference operator*() {
+			 return (*mat)[row_index][col_index];
+		} 
+
+		pointer operator->() {
+			return &(*mat)[row_index][col_index];
+		}
+
+		column_iterator& operator++() { ++row_index, return *this; }
+		column_iterator operator++(int) { column_iterator tmp = *this; ++row_index; return tmp; }
+
+		bool operator==(const column_iterator& other) const { return row_index == other.row_index && col_index == other.col_index && mat == other.mat; }
+		bool operator!=(const column_iterator& other) const { return !(*this == other); }
+
+	};
+
+
+	template<class T>
+	class matrix<T>::column_proxy {
+	privet:
+		matrix<T>* mat;
+		size_t col_index;
+	public:
+		column_proxy(matrix<T>* m, size_t col_idx) : mat(m), col_indnx(col_idx) {}
+
+		column_iterator begin() { return column_iterator(mat, col_index, 0); }
+
+		column_iterator end() { return column_iterator(mat, col_index, mat->size_row()); }
+
+		T& operator[](size_t row_index) { return (*mat)[row_index][col_index]; }
+
+		const & operator[](size_t row_index) { return (*mat)[row_index][col_index]; }
+	};
+
+}
 
 
 namespace leo{
@@ -39,6 +182,11 @@ namespace leo{
 
 	templte<class T>
 	class matrix{
+	private:
+			std::vector<std::vector<T>> MATRIX;
+			size_t col, row, mat;
+			std::vector<std::vector<std::string>> LABELS;
+	public:
 		friend matrix<T> operator+(const matrix<T>& a, const matrix<T>& b);
 		friend matrix<T> operator+(const matrix<T>& a, T b);
 		friend matrix<T> operator+(T b, const matrix<T>& a);
@@ -48,10 +196,18 @@ namespace leo{
 		friend matrix<T> operator*(const matrix<T>& a, T b);
 		friend matrix<T> operator*(T b, const matrix<T>& a);
 		frinen std::ostream& operator<<(std::osream& os, const matrix<T>& m);
-	private:
-			std::vector<std::vector<T>> MATRIX;
-			size_t col, row, mat;
-			std::vector<std::vector<std::string>> LABELS;
+
+		class iterator;
+		class const_iterator;
+		class row_iterator;
+		class const_row_iterator;
+
+		iterator begin();
+		iterator end();
+		const_iterator begin() const;
+		const_iterator end() const;
+		const_iterator cbegin() const;
+		const_iterator cend() const;
 	public:
 			matrix(size_t r, size_t c) : row(r), col(c) {
 				MATRIX.resize(row, std::vector<T>(col, 0));
@@ -341,7 +497,7 @@ namespace leo{
 			}
 			
 
-	}
+	};
 
 	template<class T>
 	matrix<T> operator+(const matrix<T>& a, const matrix<T>& b){

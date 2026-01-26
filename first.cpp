@@ -684,3 +684,67 @@ namespace leo{
 
 }
 
+namespace leo{
+	const double pi = M_PI;
+
+	template<class Iterator>
+	auto MathExcept(Iterator start, Iterator end){
+		using ValueType = typename std::iterator_traits<Iterator>::value_type;
+
+		if(start == end) throw std::invalid_argument("MathEx: empty datum!");
+
+		ValueType sume = std::accumulate(start, end, ValueType{});
+
+		auto n = std::distance(start, end);
+
+		return static_cast<double>(sum) / n;
+	}
+
+	template<class Iterator>
+	auto RMS(Iterator start, Iterator end){
+		if(start == end) throw std::invalid_argument("RMS: empty datum!");
+	
+		double result = std::inner_product(start, end, start, 0.0);
+
+		result /= std::distance(start, end);
+		
+		return std::sqrt(result);
+		
+	}
+
+	template<class Iterator>
+	auto Variation(Iterator start, Iterator end){
+		if(start == end) throw std::invalid_argument("Variation: empty datum!");
+		
+		auto n = std::distance(start, end);
+
+		auto M = MathExcept((start, end);
+
+		std::vector<double> res;
+		res.reserve(n);
+		
+		std::transform(start, end, std::back_inserter(res), [M] (double x) { return x - M; });
+
+		return RMS(res.begin(), res.end());
+	}
+
+	template<class T>
+	matrix<T> Cov(matrix<T> A){
+		size_t ol = A.size_col(); 
+		size_t row = A.size_row();
+
+		matrix<T> M(1, col);
+
+		for(size_t i=0; i < col; ++i){
+			auto start = matrix<T>::iterator_vertical(&A, 0, i);
+			auto end = matrix<T>::iterator_vertical(&A, row, i);
+			m = MathExcept(start, end);
+			M[0][i] = m;
+		}
+		
+		return 1 / (A.size() - 1) * A.transposition()(A) - n * M(M.transposition());
+
+	}
+}
+
+

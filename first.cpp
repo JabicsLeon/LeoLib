@@ -58,8 +58,32 @@ namespace leo{
 		iterator_horizontal h_end();
 
 		iterator_vertical row_begin();
-		row_vertical row_end();
+		iterator_vertical row_end();
 
+		auto Column(size_t k) const {
+			return ColumnRange{this, k};
+		}
+
+		auto Row(size_t k) const {
+			return RowRange{this, k}
+		}
+
+	private:
+		struct ColumnRange {
+			const matrix<T>* M;
+			size_t col_idx;
+
+			auto begin() { return iterator_vertical(const_cast<matrix<T>*>(M), 0, col_idx); }
+			auto end() { return begin() + M->size_row(); }
+		};
+
+		struct RowRange {
+			const matrix<T>* M;
+			size_t row_idx;
+
+			auto begin() { return iterator_horizontal(const_cast<matrix<T>*>(M), row_idx, 0); }
+			auto end() { return begin() + M->size_col(); }
+		}
 	public:
 			matrix(size_t r, size_t c) : row(r), col(c) {
 				MATRIX.resize(row, std::vector<T>(col, 0));
@@ -86,7 +110,7 @@ namespace leo{
 
 			matrix(matrix<T>&& A) noexcept : row(A.row), col(A.col), mat(A.mat), MATRIX(std::move(A.MATRIX)), LABELS(std::move(A.LABELS)){ A.row = A.col = A.mat = 0; }
 
-			 matrix<T>& operator=(matrix<T>&& A) noexcept {
+			matrix<T>& operator=(matrix<T>&& A) noexcept {
 				if (this != &A){
 					row = A.row;
 					col = A.col;
@@ -108,14 +132,6 @@ namespace leo{
 				if (r >= row) throw std::out_of_range("Row index out of range!");
 				return MATRIX[r];
                         }
-
-			auto begin() { return MARTRIX.begin(); }
-			auto end() { return MATRIX.end(); }
-			auto begin() const { return MATRIX.begin(); }
-			auto end() const { return MATRIX.end(); }
-			auto cbegin() const { return MATRIX.cbegin(); }
-			auto cend() const { return MATRIX.cend(); }
-
 
 			std::string& row_label(size_t i){
 				rteurn &LABELS[0][i];
@@ -289,11 +305,62 @@ namespace leo{
 				return result;
 			}
 
+			matrix<T> Method_Gauss(const matrix<T>& A){
+				if(!is_square()) throw std::invalid_argument("Method_Gauss: matrix is not square!");
+
+				size_t n = A.size_row();
+
+				matrix<T> B = A;
+				matrix<T> I = identity(n);
+
+				for(size_t k=0; k < n; ++k){
+					auto col_begin = iterator_vertical(&B, k, k);
+					auto col_end = iterator_vertical(&B, n - 1, k);
+					auto it  = std::max_element(col_begin, col_end);
+					auto dist_in_col = std::distance(col_begin, it);
+					if(dist_in_col != k) {
+						B.swap_row(k, k + dist_in_col);
+						I.swap_row(k, k + dist_in_col);
+					}
+
+					if(std::abs(B[k][k]) < 1e-10) throw std::invalid_argument("Method_Gauss: matrix is singular");
+
+					T pivot = B[k][k];
+					for(size_t j=k; j < B.size_col(); ++j){
+						B[k][j] /= pivot;
+						I[k][j] /= pivot;
+					}
+
+					for(size_t i=k+1; i < n; ++i){
+						T factor = B[i][k];
+						if(std::abs(factor) > 1e-10){
+							for(size_t j=k; j < n; ++j){
+								B[i][j] -= factor * B[k][j];
+								I[i][j] -= factor * I[k][j];
+							}
+						}
+					}
+				}
+
+				for(int i=n-1; i >= 0; --i){
+					for(int j=i-1; j >= 0; --j){
+						T factor = B[j][i] / B[i][i];
+						B[j][i] -= factor * B[i][i];
+						for(size_t k = 0; k < n; ++k){
+							I[j][k] -= factor * I[i][k];
+						}
+					}
+				}
+
+				return I;
+
+			}
+
 
 			T Method_Laplas(const matrix<T>& A){
-				if (A.size_col() != A.size_row()) throw std::invalid_argument("Size of column and row not eqvel!");	
+				if (!is_square()) throw std::invalid_argument("Method_Laplas: matrix is not square!");	
 
-				size_t = A.size_row()
+				size_t n = A.size_row()
 
 				if ( n == 1 ) return A[0][0]
 				if ( n == 2 ) return A[0][0] * A[1][1] - A[0][1] * A[1][0];
@@ -345,7 +412,8 @@ namespace leo{
 			}
 			
 			matrix<T> inverse(){
-				return (1 / det()) * attached();
+				if(size() <= 9) return (1 / det()) * attached();
+				else return Method_Gauss(*this);
 			}
 			
 

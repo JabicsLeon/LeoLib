@@ -16,152 +16,6 @@
 #include <string>
 
 namespace leo{
-	template<T> class matrix;
-
-	template<T>
-	class matrix<T>::iterator {
-	privet:
-		matrix<T>* mat;
-		size_t index;
-	public:
-		using iterator_category = std::random_access_iterator_tag;
-		using value_type = T;
-		using difference_type = std::ptrdiff_t;
-		using pointer = T*;
-		using reference = T&;
-
-		iterator(matrix<T>* m, size_t idx=0) : mat(m), index(idx) {}
-
-		reference operator*() {
-			size_t row = index / mat->col;
-			size_t col = index % mat->col;
-			return (*mat)[row][col];
-		}
-
-		pointer operator->() {
-			size_t row = index / mat->col;
-			size_t col = index % mat->col;
-			return &(*mat)[row][col];
-		}
-
-		iterator& operator++() { ++index; return *this; }
-		iterator operator++(int) { iterator tmp = *this; ++index; return tmp; }
-		iterator& operator--() {--index; return *this; }
-		iterator operator--(int)  { iterator tmp = *this; --index; return tmp; }
-		
-		iterator& operator+=(difference_type n) { index += n; return *this; }
-		iterator& operator-=(difference_type n) { index -= n; return *this; }
-
-		friend iterator operator+(iterator it, difference_type n) { return iterator(it.mat, it.index + n); }
-		friend iterator operator+(difference_type n, iterator it) { return it + n; }
-		friend iterator operator-(iterator it, difference_type n) { return iterator(it.mat, it.index - n); }
-		friend difference_type operator-(const iterator& a, const iterator& b) { return a.index - b.index;  }
-		
-		reference operator[](difference_type n) const { return *(*this + n); }
-
-		bool operator==(const iterator& other) const { return index == other.index && mat == other.mat; }
-		bool operator!=(const iterator& other) const { return !(*this == other);
-		bool operator<(const iterator& other) const { return index < other.index; }
-		bool operator>(const iterator& other) const { return index > other.index; }
-		bool operator<=(const iterator& other) const { return index <= other.index; }
-		bool operator>=(const iterator& other) const { return index >= other.index; }
-	};
-
-
-	template<T>	
-	class matrix<T>::row_iterator{
-	privet:
-		matrix<T>* mat;
-		size_t row_index;
-	public:
-		using iterator_category = std::random_access_iterator_tag;
-		using value_type = std::vector<T>;
-		using difference_type = std::ptrdiff_t;
-		using pointer = std::vector<T>*;
-		using reference = std::vector<T>&;
-
-		row_iterator(matrix<T>* m, size_t row_idx = 0) : mat(m), row_index(row_idx){}
-
-		reference operator*() {
-			return (*mat)[row_index];
-		}
-
-		pointer operator->() {
-			return &(*mat)[row_index];
-		}
-
-		row_iterator& operator++() { ++row_index; return *this; }
-		row_iterator operator++(int) { row_iterator tmp = *this; ++row_index; return tmp; }
-		row_iterator& operator--() { --row_index; return *this; }
-		row_iterator operator--(int) { row_iterator tmp = *this; --row_index; return tmp; }
-		
-		row_iterator& operator+=(difference_type n) { row_index += n; return *this; }
-		row_iterator& operator-=(difference_type n) { row_index -= n; return *this; }
-
-		friend row_iterator operator+(row_iterator it, difference_type n) { return row_iterator(it.mat, it.row_index + n); }
-		friend row_iterator operator+(difference_type n, row_iterator it) { return it + n; }
-		friend row_iterator operator-(row_iterator it, difference_type n) { return iterator(it.mat, it.row_index - n); }
-		friend difference_type operator-(const row_iterator& a, const row_iterator& b) { return a.row_index - b.row_index; }
-		
-		bool operator==(const row_iterator& other) const { return row_index == other.row_index && mat == other.mat; }
-		bool operator!=(const row_iterator& other) const { return !(*this == other); }
-
-	};
-
-	
-	template<class T>
-	class matrix<T>::column_iterator {
-	privet:
-		matrix<T>* mat;
-		size_t col_index;
-		size_t row_index;
-	public:
-		using iterator_category = std::forward_iterator_tag;
-		using value_type = T;
-		using difference_type = std::ptrdiff_t;
-		using pointer = T*;
-		using reference = T&;
-
-		column_iterator(matrix<T>* m, size_t col_idx, row_idx = 0) : mat(m), col_indnx(col_idx), row_index(row_idx) {}
-
-		reference operator*() {
-			 return (*mat)[row_index][col_index];
-		} 
-
-		pointer operator->() {
-			return &(*mat)[row_index][col_index];
-		}
-
-		column_iterator& operator++() { ++row_index, return *this; }
-		column_iterator operator++(int) { column_iterator tmp = *this; ++row_index; return tmp; }
-
-		bool operator==(const column_iterator& other) const { return row_index == other.row_index && col_index == other.col_index && mat == other.mat; }
-		bool operator!=(const column_iterator& other) const { return !(*this == other); }
-
-	};
-
-
-	template<class T>
-	class matrix<T>::column_proxy {
-	privet:
-		matrix<T>* mat;
-		size_t col_index;
-	public:
-		column_proxy(matrix<T>* m, size_t col_idx) : mat(m), col_indnx(col_idx) {}
-
-		column_iterator begin() { return column_iterator(mat, col_index, 0); }
-
-		column_iterator end() { return column_iterator(mat, col_index, mat->size_row()); }
-
-		T& operator[](size_t row_index) { return (*mat)[row_index][col_index]; }
-
-		const & operator[](size_t row_index) { return (*mat)[row_index][col_index]; }
-	};
-
-}
-
-
-namespace leo{
 
 	matrix<T> operator+(const matrix<T>& a, const matrix<T>& b);
 	matrix<T> operator+(const matrix<T>& a, T b);
@@ -195,19 +49,17 @@ namespace leo{
 		friend matrix<T> operator-(T b, const matrix<T>& a);
 		friend matrix<T> operator*(const matrix<T>& a, T b);
 		friend matrix<T> operator*(T b, const matrix<T>& a);
-		frinen std::ostream& operator<<(std::osream& os, const matrix<T>& m);
+		friend std::ostream& operator<<(std::osream& os, const matrix<T>& m);
+	public:
+		friend class iterator_horizontal;
+		friend class iterator_vertical;
+	
+		iterator_horizontal h_begin();
+		iterator_horizontal h_end();
 
-		class iterator;
-		class const_iterator;
-		class row_iterator;
-		class const_row_iterator;
+		iterator_vertical row_begin();
+		row_vertical row_end();
 
-		iterator begin();
-		iterator end();
-		const_iterator begin() const;
-		const_iterator end() const;
-		const_iterator cbegin() const;
-		const_iterator cend() const;
 	public:
 			matrix(size_t r, size_t c) : row(r), col(c) {
 				MATRIX.resize(row, std::vector<T>(col, 0));
@@ -605,6 +457,162 @@ namespace leo{
 		}
 		return os;
 	}
+
+
+	template<class T>
+        class matrix<T>::iterator_horizontal {
+        private:
+                matrix<T>* M;
+                size_t index;
+		
+		size_t calculate_index(size_t r, size_t c) {
+			return c + r * M->size_col();
+		}
+
+                void calculate_position(size_t idx, size_t& r, size_t& c) {
+			c = idx % M -> size_col();
+			r = idx / M -> size_col();
+		}
+
+		bool is_valid_position(size_t r, size_t c){
+			return r < M->size_row() && c < M->size_col();
+		}
+
+        public:
+                using iterator_category = std::random_access_iterator_tag;
+                using value_type = T;
+                using difference_type = std::ptrdiff_t;
+                using pointer = T*;
+                using reference = T&;
+
+		explicit iterator_horizontal(matrix<T>* m, size_t idx = 0) : M(m), index(idx) {
+                        if (index > M->size()) index = M->size();
+                }
+
+		iterator_horizontal(matrix<T>* m, size_t r = 0, size_t c = 0) : M(m) {
+                        if (is_valid_position(r, c)) index = calculate_index(r, c);
+                        else index = M->size();
+                }
+		
+
+		reference operator*() {
+			size_t r, c;
+			calculate_position(index, r, c);
+			if (!is_valid_position(r, c)) throw std::out_of_range("iterator_vertical: dereferencing out of range!");
+			return (*M)[r][c];
+                }
+
+		pointer operator->() {
+			return &(*(*this));
+		}
+
+                iterator_horizontal& operator++() { ++index; return *this; }
+                iterator_horizontal operator++(int) { iterator_horizontal tmp = *this; ++index; return tmp; }
+                iterator_horizontal& operator--() { --index; return *this; }
+                iterator_horizontal operator--(int)  { iterator_horizontal tmp = *this; --index; return tmp; }
+
+                iterator_horizontal& operator+=(difference_type n) { index += n; return *this; }
+                iterator_horizontal& operator-=(difference_type n) { index -= n; return *this; }
+
+                friend iterator_horizontal operator+(iterator_horizontal it, difference_type n) { return iterator_horizontal(it.M, it.index + n); }
+                friend iterator_horizontal operator+(difference_type n, iterator_horizontal it) { return it + n; }
+                friend iterator_horizontal operator-(iterator_horizontal it, difference_type n) { return iterator_horizontal(it.M, it.index - n); }
+                friend difference_type operator-(const iterator_horizontal& a, const iterator_horizontal& b) { return a.index - b.index;  }
+
+                reference operator[](difference_type n) const { return *(*this + n); }
+
+                bool operator==(const iterator_horizontal& other) const { return index == other.index && M == other.M; }
+                bool operator!=(const iterator_horizontal& other) const { return !(*this == other); }
+                bool operator<(const iterator_horizontal& other) const { return index < other.index; }
+                bool operator>(const iterator_horizontal& other) const { return index > other.index; }
+                bool operator<=(const iterator_horizontal& other) const { return index <= other.index; }
+                bool operator>=(const iterator_horizontal& other) const { return index >= other.index; }
+        };
+
+	template<class T>
+        typename matrix<T>::iterator_horizontal matrix<T>::h_begin() { return iterator_horizontal(this, 0); }
+
+        template<class T>
+        typename matrix<T>::iterator_horizontal matrix<T>::h_end() { return iterator_horizontal(this, this -> size()); }
+	
+
+
+	template<class T>
+	class matrix<T>::iterator_vertical {
+	private:
+		matrix<T>* M;
+		size_t index;
+
+		size_t calculate_index(size_t r, size_t c) { 
+			return r + c * M->size_row(); 
+		}
+
+		void calculate_position(size_t idx, size_t& r, size_t& c) { 
+			r = idx % M -> size_row();
+			c = idx / M -> size_row();
+		}
+
+		bool is_valid_position(size_t r, size_t c){
+			return r < M->size_row() && c < M->size_col();
+		}
+
+	public:
+		using iterator_category = std::random_access_iterator_tag;
+		using value_type = T;
+		using difference_type = std::ptrdiff_t;
+		using pointer = T*;
+		using reference = T&;
+
+		explicit iterator_vertical(matrix<T>* m, size_t idx = 0) : M(m), index(idx) { 
+			if (index > M->size()) index = M->size();
+		}
+
+		iterator_vertical(matrix<T>* m, size_t r = 0, size_t c = 0) : M(m) { 
+			if (is_valid_position(r, c)) index = calculate_index(r, c);
+			else index = M->size();
+		}
+
+		reference operator*() {
+			size_t r, c;
+			calculate_position(index, r, c);
+			if (!is_valid_position(r, c)) throw std::out_of_range("iterator_vertical: dereferencing out of range!");
+			return (*M)[r][c];
+		}
+
+		pointer operator->() {
+			return &(*(*this));
+		}
+
+		iterator_vertical& operator++() { ++index; return *this; }
+		iterator_vertical operator++(int) { iterator tmp = *this; ++index; return tmp; } 
+		iterator_vertical& operator--() { --index; return *this }
+		iterator_vertical operator--(int) { iterator tmp = *this; --index; return tmp; } 
+
+		iterator_vertical& operator+=(difference_type n) { index += n; return *this; }
+		iterator_vertical& operator-=(difference_type n) { index -= n; return *this; }
+		
+		friend iterator_vertical operator+(iterator_vertical it, difference_type n) { return iterator_vertical(it.M, it.index + n); }
+		friend iterator_vertical operator+(difference_type n, iterator_vertical it) { return it + n; }
+		friend iterator_vertical operator-(iterator_vertical it, difference_type n) { return iterator_vertical(it.M, it.index - n); }
+		friend difference_type operator-(const iterator_vertical& a, const iterator_vertical& b) { return a.index - b.index;  }
+
+		reference operator[](difference_type n) const { return *(*this + n); }
+		
+		bool operator==(const iterator_vertical& other) const { return index == other.index && mat == other.mat; }
+                bool operator!=(const iterator_vertical& other) const { return !(*this == other); }
+                bool operator<(const iterator_vertical& other) const { return index < other.index; }
+                bool operator>(const iterator_vertical& other) const { return index > other.index; }
+                bool operator<=(const iterator_vertical& other) const { return index <= other.index; }
+                bool operator>=(const iterator_vertical& other) const { return index >= other.index; }
+	
+	}
+	
+	template<class T>
+        typename matrix<T>::iterator_verticlal matrix<T>::v_begin() { return iterator_verticlal(this, 0); }
+
+	template<class T>
+	typename matrix<T>::iterator_verticlal matrix<T>::v_end() { return iterator_verticlal(this, *this -> size()); }
+
 
 }
 

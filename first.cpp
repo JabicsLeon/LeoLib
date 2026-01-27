@@ -305,6 +305,18 @@ namespace leo{
 				return result;
 			}
 
+			matrix<T> diag(){
+				if(!is_square()) throw std::invalid_argument("Method_Gauss: matrix is not square!");
+
+				size_t n = size_row()
+				matrix<T> M(n, n);
+				for(size_t i=0; i < n; ++i){
+					M[i][i] = MATRIX[i][i];
+				}
+
+				return M;
+			}
+
 			matrix<T> Method_Gauss(const matrix<T>& A){
 				if(!is_square()) throw std::invalid_argument("Method_Gauss: matrix is not square!");
 
@@ -728,9 +740,62 @@ namespace leo{
 		return RMS(res.begin(), res.end());
 	}
 
+
+	template<class Iterator1, class Iterator2>
+	auto CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, int tau){
+		if(fb == fe || gb == ge) return 0.0;
+		auto sum = 0.0;
+		int count = 0;
+		auto Mf = MathExcept(fb, fe);
+		auto Mg = MathExcept(gb, ge);
+		int tau_f = 0;
+		int tau_g = 0;
+		if (tau >= 0) tau_g = tau;
+		else tau_f = -tau;
+		Iterator1 it_f = fb + tau_f;
+		Iterator2 it_g = gb + tau_g;
+		while( it_f != fe && it_g != ge){
+			sum += (*it_f - Mf) * (*it_g - Mg);
+			it_f++;
+			it_g++;
+			count++;
+		}
+		if (count != 0) return sum/count;
+		return sum;
+	}
+
+	template<class Iterator1, class Iterator2>
+	std::vector<double> CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge){
+		auto f_dist = std::distance(fb, fe);
+		auto g_dist = std::distance(gb, ge);
+		std::vector<double> result;
+		result.reserve(f_dist + g_dist - 1);
+		for(int lag = -(g_dist-1); lag <= (f_dist - 1); ++lag){
+			result.emplace_back(CCF(fb, fe, gb, ge, lag));
+		}
+		return result;
+	}
+
+	
+	template<class Iterator>
+	auto ACF(Iterator fb, Iterator fe, int tau){
+		return CCF(fb, fe, fb, fe, tau);
+	}
+
+	template<class Iterator>
+	std::vector<double> ACF(Iterator fb, Iterator fe){
+		auto f_dist = std::distance(fb, fe);
+		std::vector<double> result;
+		result.reserve(f_dist);
+		for(size_t lag=0; lag < f_dist; ++lag){
+			result.emplace_back(ACF(fb, fe, lag));
+		}
+		return result;
+	}
+
 	template<class T>
 	matrix<T> Cov(matrix<T> A){
-		size_t ol = A.size_col(); 
+		size_t col = A.size_col(); 
 		size_t row = A.size_row();
 
 		matrix<T> M(1, col);
@@ -738,13 +803,20 @@ namespace leo{
 		for(size_t i=0; i < col; ++i){
 			auto start = matrix<T>::iterator_vertical(&A, 0, i);
 			auto end = matrix<T>::iterator_vertical(&A, row, i);
-			m = MathExcept(start, end);
+			auto m = MathExcept(start, end);
 			M[0][i] = m;
 		}
 		
-		return 1 / (A.size() - 1) * A.transposition()(A) - n * M(M.transposition());
-
+		return 1 / (row - 1) * A.transposition()(A) - n * M(M.transposition());
 	}
+
+	template<class T>
+	matrix<T> Cor(matrix<T> A){
+		matrix<T> covariation = Cov(A);
+		matrix<T> invd = covariation.diag().inverse()
+		return invd(covariation(invd));
+	}
+	
 }
 
 

@@ -10,7 +10,7 @@
 #include <complex>
 #define _USE_MATH_DEFINES
 #include <cmath>
-#include <numeric
+#include <numeric>
 #include <vector>
 #include <map>
 #include <string>
@@ -18,6 +18,8 @@
 
 //===============================================================================Matrix_modul=========================================================================================
 namespace leo{
+
+	template<class T> class matrix;
 
 	template<class T> matrix<T> operator+(const matrix<T>& a, const matrix<T>& b);
 	template<class T> matrix<T> operator+(const matrix<T>& a, T b);
@@ -27,7 +29,7 @@ namespace leo{
 	template<class T> matrix<T> operator-(T b, const matrix<T>& a);
 	template<class T> matrix<T> operator*(const matrix<T>& a, T b);
 	template<class T> matrix<T> operator*(T b, const matrix<T>& a);
-	template<class T> std::ostream& operator<<(std::osream& os, const matrix<T>& m);
+	template<class T> std::ostream& operator<<(std::ostream& os, const matrix<T>& m);
 
 	
 	enum class SM{
@@ -38,25 +40,25 @@ namespace leo{
 
 
 	//===========================Class_Matrix========================================
-	templte<class T, class Iterator>
+	template<class T>
 	class matrix{
 	private:
 			std::vector<std::vector<T>> MATRIX;
 			size_t col, row, mat;
 			std::vector<std::vector<std::string>> LABELS;
 	public:
-		friend matrix<T> operator+(const matrix<T>& a, const matrix<T>& b);
-		friend matrix<T> operator+(const matrix<T>& a, T b);
-		friend matrix<T> operator+(T b, const matrix<T>& a);
-		friend matrix<T> operator-(const matrix<T>& a, const matrix<T>& b);
-		friend matrix<T> operator-(const matrix<T>& a, T b);
-		friend matrix<T> operator-(T b, const matrix<T>& a);
-		friend matrix<T> operator*(const matrix<T>& a, T b);
-		friend matrix<T> operator*(T b, const matrix<T>& a);
-		friend std::ostream& operator<<(std::osream& os, const matrix<T>& m);
-	public:
-		friend class iterator_horizontal;
-		friend class iterator_vertical;
+		friend matrix<T> operator+<>(const matrix<T>& a, const matrix<T>& b);
+		friend matrix<T> operator+<>(const matrix<T>& a, T b);
+		friend matrix<T> operator+<>(T b, const matrix<T>& a);
+		friend matrix<T> operator-<>(const matrix<T>& a, const matrix<T>& b);
+		friend matrix<T> operator-<>(const matrix<T>& a, T b);
+		friend matrix<T> operator-<>(T b, const matrix<T>& a);
+		friend matrix<T> operator*<>(const matrix<T>& a, T b);
+		friend matrix<T> operator*<>(T b, const matrix<T>& a);
+		friend std::ostream& operator<< <>(std::ostream& os, const matrix<T>& m);
+/*	public:
+		class iterator_horizontal;
+		class iterator_vertical;
 	
 		iterator_horizontal h_begin();
 		iterator_horizontal h_end();
@@ -69,7 +71,7 @@ namespace leo{
 		}
 
 		auto Row(size_t k) const {
-			return RowRange{this, k}
+			return RowRange{this, k};
 		}
 
 	private:
@@ -87,8 +89,8 @@ namespace leo{
 
 			auto begin() { return iterator_horizontal(const_cast<matrix<T>*>(M), row_idx, 0); }
 			auto end() { return begin() + M->size_col(); }
-		}
-	public:
+		};
+	public: */
 			matrix(size_t r, size_t c) : row(r), col(c) {
 				MATRIX.resize(row, std::vector<T>(col, 0));
 				mat = row * col;
@@ -97,7 +99,7 @@ namespace leo{
 				LABELS[1].reserve(col);
 			}
 			
-			matrix(const matrix<T>& A) : row(A.row), col(A.col), mat(A.mat), MATRIX(A.MATRIX_, LABELS(A.LABELS) {}
+			matrix(const matrix<T>& A) : row(A.row), col(A.col), mat(A.mat), MATRIX(A.MATRIX), LABELS(A.LABELS) {}
 
 
 			matrix<T> operator=(const matrix<T>& A){
@@ -132,17 +134,17 @@ namespace leo{
 				return MATRIX[r];
 			}
 
-			const std::vector<T>& operator[](size_t r){
+			/*const std::vector<T>& operator[](size_t r){
 				if (r >= row) throw std::out_of_range("Row index out of range!");
 				return MATRIX[r];
-                        }
+                        }*/
 
 			std::string& row_label(size_t i){
-				rteurn &LABELS[0][i];
+				return &LABELS[0][i];
 			}
 
 			std::string& col_label(size_t i){
-				rteurn &LABELS[1][i];
+				return &LABELS[1][i];
 			}
 
 			size_t size(SM n) const {
@@ -163,6 +165,43 @@ namespace leo{
 
 			size_t size() const { return mat; }
 			
+	public:
+                class iterator_horizontal;
+                class iterator_vertical;
+    
+                iterator_horizontal h_begin();
+                iterator_horizontal h_end();
+
+                iterator_vertical v_begin();
+                iterator_vertical v_end();
+
+                auto Column(size_t k) const {
+                        return ColumnRange{this, k}; 
+                }   
+
+                auto Row(size_t k) const {
+                        return RowRange{this, k}; 
+                }   
+
+        private:
+                struct ColumnRange {
+                        const matrix<T>* M;
+                        size_t col_idx;
+
+                        auto begin() { return iterator_vertical(const_cast<matrix<T>*>(M), 0, col_idx); }
+                        auto end() { return begin() + M->size_row(); }
+                };  
+
+                struct RowRange {
+                        const matrix<T>* M;
+                        size_t row_idx;
+
+                        auto begin() { return iterator_horizontal(const_cast<matrix<T>*>(M), row_idx, 0); }
+                        auto end() { return begin() + M->size_col(); }
+                };  
+        public:
+
+
 
 			void resize(size_t nrow, size_t ncol){
 				MATRIX.resize(nrow, std::vector<T>(ncol,0));
@@ -312,7 +351,7 @@ namespace leo{
 			matrix<T> diag(){
 				if(!is_square()) throw std::invalid_argument("Method_Gauss: matrix is not square!");
 
-				size_t n = size_row()
+				size_t n = size_row();
 				matrix<T> M(n, n);
 				for(size_t i=0; i < n; ++i){
 					M[i][i] = MATRIX[i][i];
@@ -376,9 +415,9 @@ namespace leo{
 			T Method_Laplas(const matrix<T>& A){
 				if (!is_square()) throw std::invalid_argument("Method_Laplas: matrix is not square!");	
 
-				size_t n = A.size_row()
+				size_t n = A.size_row();
 
-				if ( n == 1 ) return A[0][0]
+				if ( n == 1 ) return A[0][0];
 				if ( n == 2 ) return A[0][0] * A[1][1] - A[0][1] * A[1][0];
 
 				T DET = 0;
@@ -400,8 +439,8 @@ namespace leo{
 
 			
 			 T algadd(size_t a, size_t b){
-				if ( a >= row ) throw std::invalid_argument("Row index out of range")
-				if ( b >= col ) throw std::invalid_argument("Column index out of range")
+				if ( a >= row ) throw std::invalid_argument("Row index out of range");
+				if ( b >= col ) throw std::invalid_argument("Column index out of range");
 
 				matrix<T> A = this;
 				A.erase(a, b);
@@ -431,9 +470,6 @@ namespace leo{
 				if(size() <= 9) return (1 / det()) * attached();
 				else return Method_Gauss(*this);
 			}
-
-	
-			matrix<T> ACF(Iterator fb, Iterator fe);
 			
 
 	};
@@ -505,7 +541,7 @@ namespace leo{
 		matrix<T> result(a.size_row(), a.size_col());
 		for(size_t i=0; i < a.size_row(); ++i){
 			for(size_t j=0; j < a.size_col(); ++j){
-				reresult[i][j] = b - a[i][j];
+				result[i][j] = b - a[i][j];
 			}
 		}
 		return result;
@@ -529,18 +565,19 @@ namespace leo{
 		return b * a;
 	}
 
-	std::ostream& operator<<(std::osream& os, const matrix<T>& m){
-		if(!LABELS[0].empty()) os << "\t";
-		if(!LABELS[1].empty(){
-			for(auto name : LABELS[1]){
+	template<class T>
+	std::ostream& operator<<(std::ostream& os, const matrix<T>& m){
+		if(!m.LABELS[0].empty()) os << "\t";
+		if(!m.LABELS[1].empty()){
+			for(auto name : m.LABELS[1]){
 				os << name << "\t";
 			}
 		}
 		os << "\n";
-		for(size_t i=0; i < row; ++i){
-			if(!LABELS[0].empty()) os << LABELS[0][i] << "\t";
-			for(size_t j=0; j < col; ++j){
-				os << MATRIX[i][j] << "\t";
+		for(size_t i=0; i < m.size_row(); ++i){
+			if(!m.LABELS[0].empty()) os << m.LABELS[0][i] << "\t";
+			for(size_t j=0; j < m.size_col(); ++j){
+				os << m.MATRIX[i][j] << "\t";
 			}
 			os << "\n";
 		}
@@ -673,9 +710,9 @@ namespace leo{
 		}
 
 		iterator_vertical& operator++() { ++index; return *this; }
-		iterator_vertical operator++(int) { iterator tmp = *this; ++index; return tmp; } 
-		iterator_vertical& operator--() { --index; return *this }
-		iterator_vertical operator--(int) { iterator tmp = *this; --index; return tmp; } 
+		iterator_vertical operator++(int) { iterator_vertical tmp = *this; ++index; return tmp; } 
+		iterator_vertical& operator--() { --index; return *this; }
+		iterator_vertical operator--(int) { iterator_vertical tmp = *this; --index; return tmp; } 
 
 		iterator_vertical& operator+=(difference_type n) { index += n; return *this; }
 		iterator_vertical& operator-=(difference_type n) { index -= n; return *this; }
@@ -687,20 +724,20 @@ namespace leo{
 
 		reference operator[](difference_type n) const { return *(*this + n); }
 		
-		bool operator==(const iterator_vertical& other) const { return index == other.index && mat == other.mat; }
+		bool operator==(const iterator_vertical& other) const { return index == other.index && M == other.M; }
                 bool operator!=(const iterator_vertical& other) const { return !(*this == other); }
                 bool operator<(const iterator_vertical& other) const { return index < other.index; }
                 bool operator>(const iterator_vertical& other) const { return index > other.index; }
                 bool operator<=(const iterator_vertical& other) const { return index <= other.index; }
                 bool operator>=(const iterator_vertical& other) const { return index >= other.index; }
 	
-	}
+	};
 	
 	template<class T>
-        typename matrix<T>::iterator_verticlal matrix<T>::v_begin() { return iterator_verticlal(this, 0); }
+        typename matrix<T>::iterator_vertical matrix<T>::v_begin() { return iterator_verticlal(this, 0); }
 
 	template<class T>
-	typename matrix<T>::iterator_verticlal matrix<T>::v_end() { return iterator_verticlal(this, *this -> size()); }
+	typename matrix<T>::iterator_vertical matrix<T>::v_end() { return iterator_verticlal(this, *this -> size()); }
 
 
 }
@@ -716,7 +753,7 @@ namespace leo{
 
 		if(start == end) throw std::invalid_argument("MathEx: empty datum!");
 
-		ValueType sume = std::accumulate(start, end, ValueType{});
+		ValueType sum = std::accumulate(start, end, ValueType{});
 
 		auto n = std::distance(start, end);
 
@@ -741,7 +778,7 @@ namespace leo{
 		
 		auto n = std::distance(start, end);
 
-		auto M = MathExcept((start, end);
+		auto M = MathExcept(start, end);
 
 		std::vector<double> res;
 		res.reserve(n);
@@ -804,14 +841,13 @@ namespace leo{
 		return result;
 	}
 
+namespace Matrix{
 	template<class T, class Iterator>
-	matrix<T> matrix<T>::ACF(Iterator fb, Iterator fe){
-		count = 0;
-		int lag = 0
+	matrix<T> ACF(Iterator fb, Iterator fe){
 		auto f_dist = std::distance(fb, fe);
 		matrix<T> A(f_dist, f_dist);
-		for(size_t i=0; i!=f_dist; ++i){
-			for(size_t j=0; j!=f_dist; ++j){
+		for(int i=0; i!=f_dist; ++i){
+			for(int j=0; j!=f_dist; ++j){
 				int lag = std::abs(j - i);
 				A[i][j] = ACF(fb, fe, lag);
 			}
@@ -834,16 +870,16 @@ namespace leo{
 			M[0][i] = m;
 		}
 		
-		return 1 / (row - 1) * A.transposition()(A) - n * M(M.transposition());
+		return 1 / (row - 1) * A.transposition()(A) - row * M(M.transposition());
 	}
 
 	template<class T>
 	matrix<T> Cor(matrix<T> A){
 		matrix<T> covariation = Cov(A);
-		matrix<T> invd = covariation.diag().inverse()
+		matrix<T> invd = covariation.diag().inverse();
 		return invd(covariation(invd));
 	}
-
+}
 	template<class T>
 	std::vector<T> solve(matrix<T> A, std::vector<T> d){
 		return A.inverse()(d);
@@ -855,7 +891,7 @@ namespace leo{
 
 
 int main(){
-	matrix<double> M(3, 3);
+	leo::matrix<double> M(3, 3);
 	std:: cout << M;
 
 	return 0;

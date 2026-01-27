@@ -21,15 +21,31 @@ namespace leo{
 
 	template<class T> class matrix;
 
-	template<class T> matrix<T> operator+(const matrix<T>& a, const matrix<T>& b);
-	template<class T> matrix<T> operator+(const matrix<T>& a, T b);
-	template<class T> matrix<T> operator+(T b, const matrix<T>& a);
-	template<class T> matrix<T> operator-(const matrix<T>& a, const matrix<T>& b);
-	template<class T> matrix<T> operator-(const matrix<T>& a, T b);
-	template<class T> matrix<T> operator-(T b, const matrix<T>& a);
-	template<class T> matrix<T> operator*(const matrix<T>& a, T b);
-	template<class T> matrix<T> operator*(T b, const matrix<T>& a);
-	template<class T> std::ostream& operator<<(std::ostream& os, const matrix<T>& m);
+	template<class T1,class T2> 
+	auto operator+(const matrix<T1>& a, const matrix<T2>& b) -> matrix< decltype(std::declval<T1>() + std::declval<T2>()) >;
+
+	template<class T1, class T2>
+	auto operator-(const matrix<T1>& a, const matrix<T2>& b) -> matrix< decltype(std::declval<T1>() - std::declval<T2>()) >;
+
+	template<class T, class Scalar> 
+	auto operator+(const matrix<T>& a, Scalar b) -> matrix< decltype(std::declval<T>() + std::declval<Scalar>()) >;
+
+	template<class T, class Scalar>
+	auto operator+(Scalar b ,const matrix<T>& a) -> matrix< decltype(std::declval<T>() + std::declval<Scalar>()) >;
+
+	template<class T, class Scalar>
+	auto operator-(const matrix<T>& a, Scalar b) -> matrix< decltype(std::declval<T>() - std::declval<Scalar>()) >;
+
+	template<class T, class Scalar>
+	auto  operator-(Scalar b, const matrix<T>& a) -> matrix< decltype(std::declval<Scalar>() - std::declval<T>()) >;
+
+	template<class T, class Scalar> 
+	auto  operator*(const matrix<T>& a, T b) -> matrix< decltype(std::declval<T>() * std::declval<Scalar>()) >;
+
+	template<class T, class Scalar> 
+	auto operator*(T b, const matrix<T>& a) -> matrix< decltype(std::declval<Scalar>() * std::declval<T>()) >;
+
+	template<class T>  std::ostream& operator<<(std::ostream& os, const matrix<T>& m);
 
 	
 	enum class SM{
@@ -47,14 +63,14 @@ namespace leo{
 			size_t col, row, mat;
 			std::vector<std::vector<std::string>> LABELS;
 	public:
-		friend matrix<T> operator+<>(const matrix<T>& a, const matrix<T>& b);
+		/*friend matrix<T> operator+<>(const matrix<T>& a, const matrix<T>& b);
 		friend matrix<T> operator+<>(const matrix<T>& a, T b);
 		friend matrix<T> operator+<>(T b, const matrix<T>& a);
 		friend matrix<T> operator-<>(const matrix<T>& a, const matrix<T>& b);
 		friend matrix<T> operator-<>(const matrix<T>& a, T b);
 		friend matrix<T> operator-<>(T b, const matrix<T>& a);
 		friend matrix<T> operator*<>(const matrix<T>& a, T b);
-		friend matrix<T> operator*<>(T b, const matrix<T>& a);
+		friend matrix<T> operator*<>(T b, const matrix<T>& a);*/
 		friend std::ostream& operator<< <>(std::ostream& os, const matrix<T>& m);
 /*	public:
 		class iterator_horizontal;
@@ -134,10 +150,10 @@ namespace leo{
 				return MATRIX[r];
 			}
 
-			/*const std::vector<T>& operator[](size_t r){
+			const std::vector<T>& operator[](size_t r) const {
 				if (r >= row) throw std::out_of_range("Row index out of range!");
 				return MATRIX[r];
-                        }*/
+                        }
 
 			std::string& row_label(size_t i){
 				return &LABELS[0][i];
@@ -361,7 +377,7 @@ namespace leo{
 			}
 
 			matrix<T> Method_Gauss(const matrix<T>& A){
-				if(!is_square()) throw std::invalid_argument("Method_Gauss: matrix is not square!");
+				if(!A.is_square()) throw std::invalid_argument("Method_Gauss: matrix is not square!");
 
 				size_t n = A.size_row();
 
@@ -442,7 +458,7 @@ namespace leo{
 				if ( a >= row ) throw std::invalid_argument("Row index out of range");
 				if ( b >= col ) throw std::invalid_argument("Column index out of range");
 
-				matrix<T> A = this;
+				matrix<T> A = *this;
 				A.erase(a, b);
 
 				T result = A.det();
@@ -476,12 +492,15 @@ namespace leo{
 
 
 	//===========================Operators_to_Matrix========================================
-	template<class T>
-	matrix<T> operator+(const matrix<T>& a, const matrix<T>& b){
+
+	template<class T1,class T2>
+        auto operator+(const matrix<T1>& a, const matrix<T2>& b) -> matrix< decltype(std::declval<T1>() + std::declval<T2>()) >{
+		using ResultType = decltype(std::declval<T1>() + std::declval<T2>());
+
 		if ( a.size_col() != b.size_col() ) throw std::invalid_argument("Size numbers of columns in matrixs not eqvel!");
 		if ( a.size_row() != b.size_row() ) throw std::invalid_argument("Size numbers of rows in matrixs not eqvel!");
 
-		matrix<T> result = a;
+		matrix<ResultType> result = a;
 		for(size_t i=0; i <  a.size_row(); ++i){
 			for(size_t j=0; j <  a.size_col(); ++j){
 				result[i][j] += b[i][j];
@@ -491,9 +510,12 @@ namespace leo{
 		return result;
 	}
 
-	template<class T>
-	matrix<T> operator+(const matrix<T>& a, T b){
-		matrix<T> result = a;
+
+	template<class T, class Scalar>
+        auto operator+(const matrix<T>& a, Scalar b) -> matrix< decltype(std::declval<T>() + std::declval<Scalar>()) >{
+		using ResultType = decltype(std::declval<T>() + std::declval<Scalar>());
+
+		matrix<ResultType> result = a;
 		for(size_t i=0; i <  a.size_row(); ++i){
 			for(size_t j=0; j <  a.size_col(); ++j){
 				result[i][j] += b;
@@ -503,17 +525,20 @@ namespace leo{
 		return result;
 	}
 
-	template<class T>
-	matrix<T> operator+(T b, const matrix<T>& a){
-		return a * b;
+	template<class T, class Scalar>
+        auto operator+(Scalar b ,const matrix<T>& a) -> matrix< decltype(std::declval<T>() + std::declval<Scalar>()) >{
+		return a + b;
 	}
 
-	template<class T>
-	matrix<T> operator-(const matrix<T>& a, const matrix<T>& b){
+
+	template<class T1,class T2>
+        auto operator-(const matrix<T1>& a, const matrix<T2>& b) -> matrix< decltype(std::declval<T1>() - std::declval<T2>()) >{
+		using ResultType = decltype(std::declval<T1>() - std::declval<T2>());
+
 		if ( a.size_col() != b.size_col() ) throw std::invalid_argument("Size numbers of columns in matrixs not eqvel!");
 		if ( a.size_row() != b.size_row() ) throw std::invalid_argument("Size numbers of rows in matrixs not eqvel!");
 
-		matrix<T> result = a;
+		matrix<ResultType> result = a;
 		for(size_t i=0; i <  a.size_row(); ++i){
 			for(size_t j=0; j <  a.size_col(); ++j){
 				result[i][j] -= b[i][j];
@@ -523,9 +548,12 @@ namespace leo{
 		return result;
 	}
 
-	template<class T>
-	matrix<T> operator-(const matrix<T>& a, T b){
-		matrix<T> result = a;
+
+	template<class T, class Scalar>
+        auto operator-(const matrix<T>& a, Scalar b) -> matrix< decltype(std::declval<T>() - std::declval<Scalar>()) >{
+		using ResultType = decltype(std::declval<T>() - std::declval<Scalar>());
+
+		matrix<ResultType> result = a;
 		for(size_t i=0; i <  a.size_row(); ++i){
 			for(size_t j=0; j <  a.size_col(); ++j){
 				result[i][j] -= b;
@@ -536,9 +564,11 @@ namespace leo{
 	}
 
 
-	template<class T>
-	matrix<T> operator-(T b, const matrix<T>& a){
-		matrix<T> result(a.size_row(), a.size_col());
+	template<class T, class Scalar>
+        auto  operator-(Scalar b, const matrix<T>& a) -> matrix< decltype(std::declval<Scalar>() - std::declval<T>()) >{
+		using ResultType = decltype(std::declval<Scalar>() - std::declval<T>());
+
+		matrix<ResultType> result(a.size_row(), a.size_col());
 		for(size_t i=0; i < a.size_row(); ++i){
 			for(size_t j=0; j < a.size_col(); ++j){
 				result[i][j] = b - a[i][j];
@@ -548,8 +578,10 @@ namespace leo{
 	}
 
 
-	template<class T>
-	matrix<T> operator*(T b, const matrix<T>& a){
+	template<class T, class Scalar>
+        auto  operator*(Scalar b, const matrix<T>& a) -> matrix< decltype(std::declval<Scalar>() * std::declval<T>()) >{
+		using ResultType = decltype(std::declval<Scalar>() * std::declval<T>());
+
 		matrix<T> result = a;
 		for(size_t i=0; i <  a.size_row(); ++i){
 			for(size_t j=0; j <  a.size_col(); ++j){
@@ -560,8 +592,8 @@ namespace leo{
 		return result;
 	}
 
-	template<class T>
-	matrix<T> operator*(const matrix<T>& a, T b){
+	template<class T, class Scalar> 
+        auto operator*(const matrix<T>& a, Scalar b) -> matrix< decltype(std::declval<T>() * std::declval<Scalar>()) >{
 		return b * a;
 	}
 
@@ -693,7 +725,7 @@ namespace leo{
 			if (index > M->size()) index = M->size();
 		}
 
-		iterator_vertical(matrix<T>* m, size_t r = 0, size_t c = 0) : M(m) { 
+		iterator_vertical(matrix<T>* m, size_t r, size_t c) : M(m) { 
 			if (is_valid_position(r, c)) index = calculate_index(r, c);
 			else index = M->size();
 		}
@@ -734,10 +766,10 @@ namespace leo{
 	};
 	
 	template<class T>
-        typename matrix<T>::iterator_vertical matrix<T>::v_begin() { return iterator_verticlal(this, 0); }
+        typename matrix<T>::iterator_vertical matrix<T>::v_begin() { return iterator_vertical(this, 0); }
 
 	template<class T>
-	typename matrix<T>::iterator_vertical matrix<T>::v_end() { return iterator_verticlal(this, *this -> size()); }
+	typename matrix<T>::iterator_vertical matrix<T>::v_end() { return iterator_vertical(this, *this -> size()); }
 
 
 }
@@ -831,9 +863,12 @@ namespace leo{
 	}
 
 	template<class Iterator>
-	std::vector<double> ACF(Iterator fb, Iterator fe){
+	auto /*std::vector<double>*/ ACF(Iterator fb, Iterator fe) -> std::vector<typename std::iterator_traits<Iterator>::value_type>
+	{
+		using T = typename std::iterator_traits<Iterator>::value_type;
+
 		auto f_dist = std::distance(fb, fe);
-		std::vector<double> result;
+		std::vector<T> result;
 		result.reserve(f_dist);
 		for(size_t lag=0; lag < f_dist; ++lag){
 			result.emplace_back(ACF(fb, fe, lag));
@@ -842,14 +877,17 @@ namespace leo{
 	}
 
 namespace Matrix{
-	template<class T, class Iterator>
-	matrix<T> ACF(Iterator fb, Iterator fe){
+	template<class Iterator>
+	auto ACF(Iterator fb, Iterator fe) -> matrix<typename std::iterator_traits<Iterator>::value_type> 
+						//decltype(matrix<typename std::iterator_traits<Iterator>::value_type>())
+	{
+		using T = typename std::iterator_traits<Iterator>::value_type;
 		auto f_dist = std::distance(fb, fe);
 		matrix<T> A(f_dist, f_dist);
 		for(int i=0; i!=f_dist; ++i){
 			for(int j=0; j!=f_dist; ++j){
 				int lag = std::abs(j - i);
-				A[i][j] = ACF(fb, fe, lag);
+				A[i][j] = leo::ACF(fb, fe, lag);
 			}
 		}
 	
@@ -858,8 +896,8 @@ namespace Matrix{
 
 	template<class T>
 	matrix<T> Cov(matrix<T> A){
-		size_t col = A.size_col(); 
-		size_t row = A.size_row();
+		int col = A.size_col(); 
+		int row = A.size_row();
 
 		matrix<T> M(1, col);
 
@@ -891,8 +929,51 @@ namespace Matrix{
 
 
 int main(){
-	leo::matrix<double> M(3, 3);
-	std:: cout << M;
+	leo::matrix<double> A(4, 4);
+
+	A[0][0] = 1; A[0][1] = 2; A[0][2] = 3; A[0][3] = 3;
+
+	A[1][0] = 4; A[1][1] = 5; A[1][2] = 10; A[1][3] = 3;
+
+	A[2][0] = 7; A[2][1] = 8; A[2][2] = 9; A[2][3] = 10;
+
+	A[3][0] = 20; A[3][1] = 8; A[3][2] = 5; A[3][3] = 3;
+
+	std:: cout << A << "\nTransposition:" << A.transposition();
+
+	std:: cout << A.det();
+
+	std:: cout << A.inverse();
+
+	std::vector<double> d = { 1, 2, 3, 4 };
+
+	std::vector<double> sl = leo::solve(A, d);
+	
+	std::cout << "\n";
+
+	for(auto el : sl){
+		std::cout << el << "\t";
+	}	
+
+	std::cout << "\n";
+
+	std::cout << leo::Matrix::ACF(d.begin(), d.end());
+
+	std::vector<double> tl = leo::ACF(d.begin(), d.end());
+
+	std::cout << "\n";
+
+	for(auto el : tl){
+                std::cout << el << "\t";
+        }
+	
+	std::cout << "\n";
+
+	std::cout << 2 * leo::matrix<double>::identity(4);
+	
+	std::cout << leo::Matrix::Cov(A);
+
+	//std::cout << leo::Matrix::Cor(A);
 
 	return 0;
 }

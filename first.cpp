@@ -15,17 +15,19 @@
 #include <map>
 #include <string>
 
+
+//===============================================================================Matrix_modul=========================================================================================
 namespace leo{
 
-	matrix<T> operator+(const matrix<T>& a, const matrix<T>& b);
-	matrix<T> operator+(const matrix<T>& a, T b);
-	matrix<T> operator+(T b, const matrix<T>& a);
-	matrix<T> operator-(const matrix<T>& a, const matrix<T>& b);
-	matrix<T> operator-(const matrix<T>& a, T b);
-	matrix<T> operator-(T b, const matrix<T>& a);
-	matrix<T> operator*(const matrix<T>& a, T b);
-	matrix<T> operator*(T b, const matrix<T>& a);
-	std::ostream& operator<<(std::osream& os, const matrix<T>& m);
+	template<class T> matrix<T> operator+(const matrix<T>& a, const matrix<T>& b);
+	template<class T> matrix<T> operator+(const matrix<T>& a, T b);
+	template<class T> matrix<T> operator+(T b, const matrix<T>& a);
+	template<class T> matrix<T> operator-(const matrix<T>& a, const matrix<T>& b);
+	template<class T> matrix<T> operator-(const matrix<T>& a, T b);
+	template<class T> matrix<T> operator-(T b, const matrix<T>& a);
+	template<class T> matrix<T> operator*(const matrix<T>& a, T b);
+	template<class T> matrix<T> operator*(T b, const matrix<T>& a);
+	template<class T> std::ostream& operator<<(std::osream& os, const matrix<T>& m);
 
 	
 	enum class SM{
@@ -34,7 +36,9 @@ namespace leo{
 		mat,
 	};
 
-	templte<class T>
+
+	//===========================Class_Matrix========================================
+	templte<class T, class Iterator>
 	class matrix{
 	private:
 			std::vector<std::vector<T>> MATRIX;
@@ -427,10 +431,15 @@ namespace leo{
 				if(size() <= 9) return (1 / det()) * attached();
 				else return Method_Gauss(*this);
 			}
+
+	
+			matrix<T> ACF(Iterator fb, Iterator fe);
 			
 
 	};
 
+
+	//===========================Operators_to_Matrix========================================
 	template<class T>
 	matrix<T> operator+(const matrix<T>& a, const matrix<T>& b){
 		if ( a.size_col() != b.size_col() ) throw std::invalid_argument("Size numbers of columns in matrixs not eqvel!");
@@ -538,7 +547,7 @@ namespace leo{
 		return os;
 	}
 
-
+	//===========================Iterators_to_Matrix========================================
 	template<class T>
         class matrix<T>::iterator_horizontal {
         private:
@@ -696,6 +705,8 @@ namespace leo{
 
 }
 
+
+//===============================================================================Math_modul=========================================================================================
 namespace leo{
 	const double pi = M_PI;
 
@@ -793,6 +804,22 @@ namespace leo{
 		return result;
 	}
 
+	template<class T, class Iterator>
+	matrix<T> matrix<T>::ACF(Iterator fb, Iterator fe){
+		count = 0;
+		int lag = 0
+		auto f_dist = std::distance(fb, fe);
+		matrix<T> A(f_dist, f_dist);
+		for(size_t i=0; i!=f_dist; ++i){
+			for(size_t j=0; j!=f_dist; ++j){
+				int lag = std::abs(j - i);
+				A[i][j] = ACF(fb, fe, lag);
+			}
+		}
+	
+		return A;
+	}
+
 	template<class T>
 	matrix<T> Cov(matrix<T> A){
 		size_t col = A.size_col(); 
@@ -816,7 +843,24 @@ namespace leo{
 		matrix<T> invd = covariation.diag().inverse()
 		return invd(covariation(invd));
 	}
+
+	template<class T>
+	std::vector<T> solve(matrix<T> A, std::vector<T> d){
+		return A.inverse()(d);
+	}
 	
 }
+
+//===============================================================================Test_modul=========================================================================================
+
+
+int main(){
+	matrix<double> M(3, 3);
+	std:: cout << M;
+
+	return 0;
+}
+
+
 
 

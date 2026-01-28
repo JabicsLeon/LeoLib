@@ -3,6 +3,9 @@
 #include <iostream>
 #include <functional>
 #include <stdexcept>
+#include <tuple>
+#include <tuple_traits>
+#include <utility>
 #include <algorithm>
 #include <iterator>
 #include <random>
@@ -824,6 +827,107 @@ namespace leo{
 
 }
 
+//===============================================================================Applay_function_modul=========================================================================================
+namespace leo{
+	template<typename T>
+	struct is_iterator_pair{ static constexpr bool value = false; };
+
+	template<typename Iterator>
+	struct is_iterator_pair<std::pair<Iterator, Iterator>>{
+		static constexpr bool value = true;
+		using value_type = typename std::iterator_traits<Iterator>::value_type;
+	};
+
+	template<typename T>
+	inline constexpr bool is_iterator_pair_v = is_iterator_pair<T>::value;
+
+	template<typename Func, typename... Args>
+	auto applay_to_range(Func&& func, Args&&... args){
+		using result_type = decltype( func( std::declval< 
+						typename std::coditional_t< 
+							is_iterator_pair_v<
+								std::decay_t<Args>
+							>, 
+							typename is_iterator_pair<
+								std::decay_t<Args>
+							>::value_type,
+							std::decay_t<Args>
+						>...
+					> ) );
+		
+		std::vector<result_type> result;
+
+		size_t distance = 0;
+		bool distance_initialized = false;
+		
+		auto init_distance = [&](auto& arg) {
+			if constexpr (is_iterator_pair_v< std::decay_t< decltype(arg) > >) {
+				if (!distance_initialized){
+					distance = std::distance(arg.first, arg.second);
+					distance_initialized = true;
+				} else if(distance !=  std::distance(arg.first, arg.second)) throw std:: invalid_argument("applay_to_range - all iterator pairs mast have the same distance");		
+			}
+		};
+
+		(init_distance(args), ...);
+
+		if(!distance_initialized) {
+			distance = 1;
+		}
+
+		result.reserve(distance);
+
+		auto get_value = [](auto&& arg, size_t index) -> decltupe(auto){
+			if constexpr (is_iterator_pair_v< std::decay_t< decltype(arg) > >){
+				auto it = arg.first;
+				std::advance(it, index);
+				return *it;
+			} else {
+				return arg;
+			}
+		};
+
+		for(size_t i=0; i < distance; ++i){
+			auto call_func = [&](auto&&... call_args){
+				return func(call_args...);
+			};
+
+			result.push_back(call_func(get_value(args, i)...));
+		}
+
+		return result;
+	}
+
+
+	template<class T, typename Func, typename... Args>
+	auto applay_to_matrix(Func&& func, Args&&... args, matrix<T> A){
+		using result_type = decltype( func( std::declval<
+                                                typename std::coditional_t<
+                                                        is_iterator_pair_v<
+                                                                std::decay_t<Args>
+                                                        >,
+                                                        typename is_iterator_pair<
+                                                                std::decay_t<Args>
+                                                        >::value_type,
+                                                        std::decay_t<Args>
+                                                >...
+                                        > ) );
+
+		std::vector<result_type> res = applay_to_range(func, args...);
+	
+		auto itv = res.begin();		
+
+		for(auto it=A.h_begin(); it!=A.h_end(); ++it){
+			*it = *itv;
+			itv++;
+		}
+		return A;
+	}
+
+
+}
+
+
 
 //===============================================================================Math_modul=========================================================================================
 namespace leo{
@@ -1041,6 +1145,8 @@ int main(){
 	std::cout << leo::Matrix::Cor(A);
 	
 	std::cout << leo::matrix<double>::Cor(A);
+
+	std::cout << applay_to_matrix(std::sqrt, std::make_pair(A.h_begin()), A);
 
 	return 0;
 }

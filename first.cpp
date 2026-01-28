@@ -202,6 +202,15 @@ namespace leo{
                         return RowRange{this, k}; 
                 }   
 
+
+		auto AllColumn(){
+			return AllColumnRange{this};
+		}
+
+		auto AllRow(){
+			return AllRowRange{this};
+		}
+
         private:
                 struct ColumnRange {
                         const matrix<T>* M;
@@ -218,6 +227,22 @@ namespace leo{
                         auto begin() { return iterator_horizontal(const_cast<matrix<T>*>(M), row_idx, 0); }
                         auto end() { return begin() + M->size_col(); }
                 };  
+
+		struct AllColumnRange{
+			const matrix<T>* M;
+			
+			auto begin() { return iterator_vertical(const_cast<matrix<T>*>(M), 0); }
+			auto end() { return begin() + M->size(); }
+		};
+
+		struct AllRowRange{
+			const matrix<T>* M;
+
+			auto begin() { return iterator_horizontal(const_cast<matrix<T>*>(M), 0); }
+			auto end() { return begin() + M->size(); }
+		};
+		
+
         public:
 
 
@@ -1174,6 +1199,124 @@ namespace Matrix{
 	std::vector<T> solve(matrix<T> A, std::vector<T> d){
 		return A.inverse()(d);
 	}
+
+namespace BackFFT{
+
+	template<class T>
+	void FFT(std::vector<std::complex<T>>& x, bool inverse=false){
+		const size_t N = x.size();
+		if(N<=1) return;
+
+		std::vector<std::complex<T>> even(N/2);
+		std::vector<std::complex<T>> odd(N/2);
+
+		for(size_t i=0; i < N/2; ++i){
+			even[i] = x[i * 2];
+			odd[i] = x[i * 2 + 1];
+		}
+
+		FFT(even, inverse);
+		FFT(odd, inverse);
+
+		T angle = 2 * pi / N * (inverse ? 1 : -1);
+		std::complex<T> w(1);
+		std::complex<T> wn(std::cos(angle), std::sin(angle));
+
+		for(size_t i=0; i<N/2; ++i){
+			x[i] = even[i] + w * odd[i];
+			x[i + N/2] = even[i] - w * odd[i];
+			if(inverse){
+				x[i] /= 2;
+				x[i + N/2] /= 2;
+			}
+			w *= wn;
+		} 
+
+	}
+
+	size_t next_power_of_two(size_t n){
+		if(n == 0) return 1;
+		size_t power = 1;
+		while (power < n) power <<= 1;
+		return power;
+	}
+
+	template<typename T>
+	struct is_complex : std::false_type {};
+
+	template<typename T>
+	struct is_complex<std::complex<T>> : std::true_type {};
+
+	template<typename T>
+	inline constexpr bool is_complex_v = is_complex<T>::value;
+
+	template<typename Iterator>
+	bool is_complex_iterator(Iterator it) {
+		using ValueType = std::decay_t<decltype(*it)>;
+		return is_complex_v<ValueType>;
+	}
+
+	template<typename Iterator>
+	auto FFT_complex(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
+	{
+		using result_type = std::decay_t<decltype(*xb)>;
+		
+		size_t n = std::distance(xb, xe);
+
+		std::vector<std::complex<result_type>> res;
+		res.reserve(n);
+
+		for(auto it = xb; it != xe; ++it){ 
+			res.emplace_back(*it);
+		}
+
+		size_t N = next_power_of_two(n);
+		res.resize(N, 0);
+
+		BackFFT::FFT(res, inverse);
+		res.resize(n);
+		
+		return res;
+	}
+
+	template<typename Iterator>
+	auto FFT_real(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
+	{
+		using result_type = std::decay_t<decltype(*xb)>;
+
+		size_t n = std::distance(xb, xe);
+			
+		std::vector<std::complex<result_type>> res;
+		res.reserve(n);
+
+		for(auto it = xb; it != xe; ++it){
+			res.emplace_back(std::complex<result_type>(*it, 0));
+		}
+
+		size_t N = next_power_of_two(n);
+		res.resize(N, std::complex<result_type>(0, 0));
+
+		BackFFT::FFT(res, inverse);
+		
+		if(inverse){
+			std::vector<result_type> result(n);
+			for(size_t i=0; i < n; ++i){
+				 result[i] = res[i].real();
+			}
+
+			return result;
+			} else return res;
+	}
+
+
+}
+	template<typename Iterator>
+	auto FFT(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
+	{
+		using value_type = std::decay_t<decltype(*xb)>;
+		if constexpr (!BackFFT::is_complex_v<value_type>) return BackFFT::FFT_real(xb, xe, inverse);
+		else return BackFFT::FFT_complex(xb, xe, inverse);
+	}
 	
 }
 
@@ -1181,66 +1324,21 @@ namespace Matrix{
 
 
 int main(){
-	leo::matrix<double> A(3, 3);
+	leo::matrix<double> A(4, 4);
 
-	A[0][0] = 1; A[0][1] = 2; A[0][2] = 3; //A[0][3] = 3;
+	A[0][0] = 1; A[0][1] = 2; A[0][2] = 3; A[0][3] = 3;
 
-	A[1][0] = 4; A[1][1] = 5; A[1][2] = 10; //A[1][3] = 3;
+	A[1][0] = 4; A[1][1] = 5; A[1][2] = 10; A[1][3] = 3;
 
-	A[2][0] = 7; A[2][1] = 8; A[2][2] = 9; //A[2][3] = 10;
+	A[2][0] = 7; A[2][1] = 8; A[2][2] = 9; A[2][3] = 10;
 
-	//A[3][0] = 20; A[3][1] = 8; A[3][2] = 5; A[3][3] = 3;
+	A[3][0] = 20; A[3][1] = 8; A[3][2] = 5; A[3][3] = 3;
 
-	std:: cout << A;/* << "\nTransposition:"; << A.transposition();
-
-	std:: cout << A.det();
-
-	std:: cout << A.inverse();
-
-	std::vector<double> d = { 1, 2, 3 };
-
-	std::vector<double> sl = leo::solve(A, d);
-	
-	std::cout << "\n";
-
-	for(auto el : sl){
-		std::cout << el << "\t";
-	}	
-
-	std::cout << "\n";
-
-	std::cout << leo::Matrix::ACF(d.begin(), d.end());
-
-	std::vector<double> tl = leo::ACF(d.begin(), d.end());
-
-	std::cout << "\n";
-
-	for(auto el : tl){
-                std::cout << el << "\t";
-        }
-	
-	std::cout << "\n";
-
-	std::cout << 2 * leo::matrix<double>::identity(4);
-
-	std::cout << "\n";
-
-	double k = 1.0 / (A.size_row() - 1.0);
-
-	std::cout << k << "\n" << 1.0 / (A.size_row() - 1.0) * A.transposition()(A);
-
-*/
-
-	//std::cout << leo::Variation
-	
-	std::cout << leo::Matrix::Cov(A);
-
-	std::cout << leo::matrix<double>::Cov(A).diag() << leo::matrix<double>::Cov(A).diag().inverse();
+	std::cout << A;
 
 	std::cout << leo::Matrix::Cor(A);
 	
 	std::cout << leo::matrix<double>::Cor(A);
-
 
 	return 0;
 }

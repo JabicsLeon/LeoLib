@@ -647,9 +647,12 @@ namespace leo{
                         if (index > M->size()) index = M->size();
                 }
 
-		iterator_horizontal(matrix<T>* m, size_t r = 0, size_t c = 0) : M(m) {
+		iterator_horizontal(matrix<T>* m, size_t r, size_t c) : M(m) {
                         if (is_valid_position(r, c)) index = calculate_index(r, c);
-                        else index = M->size();
+                        else {
+				index = M->size();
+				throw std::invalid_argument("iterator_vertical - index out of range");
+			}
                 }
 		
 
@@ -727,7 +730,10 @@ namespace leo{
 
 		iterator_vertical(matrix<T>* m, size_t r, size_t c) : M(m) { 
 			if (is_valid_position(r, c)) index = calculate_index(r, c);
-			else index = M->size();
+			else {
+				index = M->size();
+				throw std::invalid_argument("iterator_vertical - index out of range");
+			}
 		}
 
 		reference operator*() {
@@ -781,6 +787,7 @@ namespace leo{
 
 	template<class Iterator>
 	auto MathExcept(Iterator start, Iterator end){
+
 		using ValueType = typename std::iterator_traits<Iterator>::value_type;
 
 		if(start == end) throw std::invalid_argument("MathEx: empty datum!");
@@ -791,6 +798,44 @@ namespace leo{
 
 		return static_cast<double>(sum) / n;
 	}
+
+	template<class Iterator>
+	auto MathExcept_old(Iterator start, Iterator end) -> typename std::iterator_traits<Iterator>::value_type
+        {
+                using T = typename std::iterator_traits<Iterator>::value_type;	
+
+		T sum = 0.0;
+
+		auto n = std::distance(start, end);
+
+		for(auto it=start; it!=end; ++it){
+			sum += *it;
+		}
+		sum /= n;
+		return sum;
+	}
+
+	template<class Iterator>
+        auto MathEx(Iterator start, Iterator end, size_t len) -> typename std::iterator_traits<Iterator>::value_type
+        {
+                using T = typename std::iterator_traits<Iterator>::value_type;
+
+                T sum = 0.0;
+		
+		size_t n_dop = end - start;
+
+                auto n = std::distance(start, end);
+		//auto it = start;
+		std::cout << "\nIn math ex: 0\t";
+                for(auto it=start; it!=end; ++it){
+                        sum += *it;
+			std::cout << " + " << *it;
+                }
+		std::cout << " = " << sum;
+                sum /= n;
+		std::cout << " | n = " << n << "; n_dop = " << n_dop << "; M = " << sum << "\n";
+                return sum;
+        }
 
 	template<class Iterator>
 	auto RMS(Iterator start, Iterator end){
@@ -902,22 +947,78 @@ namespace Matrix{
 		matrix<T> M(1, col);
 
 		for(size_t i=0; i < col; ++i){
-			auto start = matrix<T>::iterator_vertical(&A, 0, i);
-			auto end = matrix<T>::iterator_vertical(&A, row, i);
+			//auto start = typename matrix<T>::iterator_vertical(&A, 0, i);
+			//auto end = typename matrix<T>::iterator_vertical(&A, row, i);
+			auto start = A.Column(i).begin();
+			auto end = A.Column(i).end();
 			auto m = MathExcept(start, end);
 			M[0][i] = m;
 		}
 		
-		return 1 / (row - 1) * A.transposition()(A) - row * M(M.transposition());
+		return 1.0 / (row/* - 1.0*/) * (A.transposition()(A) - row * M.transposition()(M));
 	}
 
 	template<class T>
-	matrix<T> Cor(matrix<T> A){
-		matrix<T> covariation = Cov(A);
+	matrix<T> Cor(const matrix<T>& A){
+		matrix<T> covariation = Matrix::Cov(A);
 		matrix<T> invd = covariation.diag().inverse();
 		return invd(covariation(invd));
 	}
 }
+	
+	
+	template<class T>
+	matrix<T> Cov(matrix<T> B){
+		matrix<T> M(1,B.size_col());
+
+		for(size_t i=0; i < B.size_row(); ++i){
+			//auto start = typename matrix<T>::iterator_vertical(&B, 0, i);
+			//auto end = typename matrix<T>::iterator_vertical(&B, B.size_row(), i);
+			auto start = B.Column(i).begin();
+			auto end = B.Column(i).end();
+			auto m = MathExcept(start, end);
+			M[0][i] = m;
+			//for(auto it : B.Row(i)) it -= m;
+		}
+		for(size_t i=0; i < B.size_row(); ++i){
+                        for(size_t j=0; j < B.size_col(); ++j){
+				B[i][j] -= M[0][j];
+			}
+		}
+
+		return 1.0 / (B.size_row() /*- 1.0*/) * B.transposition()(B);
+	}
+
+
+	template<class T>
+	matrix<T> Cov_old(matrix<T> A){
+		matrix<T> cov(A.size_col(), A.size_col());
+
+		for(size_t j=0; j < A.size_col(); ++j){
+			T mean = 0;
+			for(size_t i=0; i < A.size_row(); ++i){
+				mean += A[i][j];
+			}
+			mean /= A.size_row();
+			for(size_t i=0; i < A.size_row(); ++i){
+				A[i][j] -= mean;
+			}
+		}
+
+		for(size_t j=0; j < A.size_col(); ++j){
+			for(size_t k=0; k < A.size_col(); ++k){
+				T mean = 0;
+				for(size_t i=0; i < A.size_row(); ++i){
+					mean += A[i][j] * A[i][k];
+				}
+				mean /=  A.size_row();
+				cov[k][j] = mean;
+			}
+		}		
+		return cov;
+	}
+
+
 	template<class T>
 	std::vector<T> solve(matrix<T> A, std::vector<T> d){
 		return A.inverse()(d);
@@ -939,7 +1040,7 @@ int main(){
 
 	A[3][0] = 20; A[3][1] = 8; A[3][2] = 5; A[3][3] = 3;
 
-	std:: cout << A << "\nTransposition:" << A.transposition();
+	std:: cout << A;/* << "\nTransposition:"; << A.transposition();
 
 	std:: cout << A.det();
 
@@ -970,10 +1071,64 @@ int main(){
 	std::cout << "\n";
 
 	std::cout << 2 * leo::matrix<double>::identity(4);
+
+	std::cout << "\n";
+
+	double k = 1.0 / (A.size_row() - 1.0);
+
+	std::cout << k << "\n" << 1.0 / (A.size_row() - 1.0) * A.transposition()(A);
+
+*/
+	std::cout << "\n";
+	int row = A.size_row();
+	int col = A.size_col();
+	leo::matrix<double> M(1, col);
+	leo::matrix<double> M_(1, col);
+        for(size_t i=0; i < col; ++i){
+                        auto start = A.Column(i).begin();
+                        auto end = A.Column(i).end();
+			//auto start = typename leo::matrix<double>::iterator_vertical(&A, 0, i);
+                        //auto end = typename leo::matrix<double>::iterator_vertical(&A, A.size_row(), i);
+                        auto m = leo::MathExcept(start, end);
+			auto m_ = leo::MathEx(start, end, A.size_row());
+                        M[0][i] = m;
+			M_[0][i] = m_;
+			for(auto it : A.Column(i)) std::cout << it << "\t";
+			std::cout << "\n";
+			
+         }
+	std::cout << "MathExcept:\t";
+	std::cout << M;
+
+	std::cout << "MathEx:\t";
+	std::cout << M_;
+
+	//std::cout << leo::Variation
 	
 	std::cout << leo::Matrix::Cov(A);
 
+	//std::cout << leo::Matrix::Cov(A).diag().inverse();
+
 	//std::cout << leo::Matrix::Cor(A);
+
+	std::cout << leo::Cov(A);
+
+	std::cout << leo::Cov_old(A);
+
+/*	leo::matrix<double> test(2, 2);
+	test[0][0] = 1; test[0][1] = 2;
+	test[1][0] = 3; test[1][1] = 4;
+
+	leo::matrix<double> test_T = test.transposition();
+	std::cout << "test:\n" << test << std::endl;
+	std::cout << "test transposed:\n" << test_T << std::endl;
+
+	// Умножение test_T на test
+	leo::matrix<double> test_ATA = test_T(test);
+	std::cout << "testᵀ * test:\n" << test_ATA << std::endl;
+*/
+
+	
 
 	return 0;
 }

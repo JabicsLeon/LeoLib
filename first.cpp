@@ -486,7 +486,51 @@ namespace leo{
 				if(size() <= 9) return (1 / det()) * attached();
 				else return Method_Gauss(*this);
 			}
+
+
+
+
 			
+			static matrix<T> Cov(matrix<T> A){
+			       matrix<T> cov(A.size_col(), A.size_col());
+
+				for(size_t j=0; j < A.size_col(); ++j){
+					T mean = 0;
+					for(size_t i=0; i < A.size_row(); ++i){
+						mean += A[i][j];
+					}
+					mean /= A.size_row();
+					for(size_t i=0; i < A.size_row(); ++i){
+						A[i][j] -= mean;
+					}
+				}
+
+				for(size_t j=0; j < A.size_col(); ++j){
+					for(size_t k=0; k < A.size_col(); ++k){
+						T mean = 0;
+						for(size_t i=0; i < A.size_row(); ++i){
+							mean += A[i][j] * A[i][k];
+						}
+						mean /=  A.size_row();
+						cov[k][j] = mean;
+					}
+				}
+				return cov;
+			}
+
+
+			static matrix<T> Cor(matrix<T> A){
+				size_t n = A.size_col();
+				matrix<T> cov = leo::matrix<T>::Cov(A);
+				matrix<T> cor = cov;
+
+				for(size_t i=0; i<n; ++i){
+					for(size_t j=0; j<n; ++j){
+						cor[j][i] /= std::sqrt(cov[i][i]) * std::sqrt(cov[j][j]); 
+					}
+				}
+				return cor;
+			}
 
 	};
 
@@ -799,43 +843,6 @@ namespace leo{
 		return static_cast<double>(sum) / n;
 	}
 
-	template<class Iterator>
-	auto MathExcept_old(Iterator start, Iterator end) -> typename std::iterator_traits<Iterator>::value_type
-        {
-                using T = typename std::iterator_traits<Iterator>::value_type;	
-
-		T sum = 0.0;
-
-		auto n = std::distance(start, end);
-
-		for(auto it=start; it!=end; ++it){
-			sum += *it;
-		}
-		sum /= n;
-		return sum;
-	}
-
-	template<class Iterator>
-        auto MathEx(Iterator start, Iterator end, size_t len) -> typename std::iterator_traits<Iterator>::value_type
-        {
-                using T = typename std::iterator_traits<Iterator>::value_type;
-
-                T sum = 0.0;
-		
-		size_t n_dop = end - start;
-
-                auto n = std::distance(start, end);
-		//auto it = start;
-		std::cout << "\nIn math ex: 0\t";
-                for(auto it=start; it!=end; ++it){
-                        sum += *it;
-			std::cout << " + " << *it;
-                }
-		std::cout << " = " << sum;
-                sum /= n;
-		std::cout << " | n = " << n << "; n_dop = " << n_dop << "; M = " << sum << "\n";
-                return sum;
-        }
 
 	template<class Iterator>
 	auto RMS(Iterator start, Iterator end){
@@ -947,15 +954,13 @@ namespace Matrix{
 		matrix<T> M(1, col);
 
 		for(size_t i=0; i < col; ++i){
-			//auto start = typename matrix<T>::iterator_vertical(&A, 0, i);
-			//auto end = typename matrix<T>::iterator_vertical(&A, row, i);
 			auto start = A.Column(i).begin();
 			auto end = A.Column(i).end();
 			auto m = MathExcept(start, end);
 			M[0][i] = m;
 		}
 		
-		return 1.0 / (row/* - 1.0*/) * (A.transposition()(A) - row * M.transposition()(M));
+		return 1.0 / (row - 1.0) * (A.transposition()(A) - row * M.transposition()(M));
 	}
 
 	template<class T>
@@ -966,59 +971,6 @@ namespace Matrix{
 	}
 }
 	
-	
-	template<class T>
-	matrix<T> Cov(matrix<T> B){
-		matrix<T> M(1,B.size_col());
-
-		for(size_t i=0; i < B.size_row(); ++i){
-			//auto start = typename matrix<T>::iterator_vertical(&B, 0, i);
-			//auto end = typename matrix<T>::iterator_vertical(&B, B.size_row(), i);
-			auto start = B.Column(i).begin();
-			auto end = B.Column(i).end();
-			auto m = MathExcept(start, end);
-			M[0][i] = m;
-			//for(auto it : B.Row(i)) it -= m;
-		}
-		for(size_t i=0; i < B.size_row(); ++i){
-                        for(size_t j=0; j < B.size_col(); ++j){
-				B[i][j] -= M[0][j];
-			}
-		}
-
-		return 1.0 / (B.size_row() /*- 1.0*/) * B.transposition()(B);
-	}
-
-
-	template<class T>
-	matrix<T> Cov_old(matrix<T> A){
-		matrix<T> cov(A.size_col(), A.size_col());
-
-		for(size_t j=0; j < A.size_col(); ++j){
-			T mean = 0;
-			for(size_t i=0; i < A.size_row(); ++i){
-				mean += A[i][j];
-			}
-			mean /= A.size_row();
-			for(size_t i=0; i < A.size_row(); ++i){
-				A[i][j] -= mean;
-			}
-		}
-
-		for(size_t j=0; j < A.size_col(); ++j){
-			for(size_t k=0; k < A.size_col(); ++k){
-				T mean = 0;
-				for(size_t i=0; i < A.size_row(); ++i){
-					mean += A[i][j] * A[i][k];
-				}
-				mean /=  A.size_row();
-				cov[k][j] = mean;
-			}
-		}		
-		return cov;
-	}
-
-
 	template<class T>
 	std::vector<T> solve(matrix<T> A, std::vector<T> d){
 		return A.inverse()(d);
@@ -1079,56 +1031,16 @@ int main(){
 	std::cout << k << "\n" << 1.0 / (A.size_row() - 1.0) * A.transposition()(A);
 
 */
-	std::cout << "\n";
-	int row = A.size_row();
-	int col = A.size_col();
-	leo::matrix<double> M(1, col);
-	leo::matrix<double> M_(1, col);
-        for(size_t i=0; i < col; ++i){
-                        auto start = A.Column(i).begin();
-                        auto end = A.Column(i).end();
-			//auto start = typename leo::matrix<double>::iterator_vertical(&A, 0, i);
-                        //auto end = typename leo::matrix<double>::iterator_vertical(&A, A.size_row(), i);
-                        auto m = leo::MathExcept(start, end);
-			auto m_ = leo::MathEx(start, end, A.size_row());
-                        M[0][i] = m;
-			M_[0][i] = m_;
-			for(auto it : A.Column(i)) std::cout << it << "\t";
-			std::cout << "\n";
-			
-         }
-	std::cout << "MathExcept:\t";
-	std::cout << M;
-
-	std::cout << "MathEx:\t";
-	std::cout << M_;
 
 	//std::cout << leo::Variation
 	
 	std::cout << leo::Matrix::Cov(A);
 
-	//std::cout << leo::Matrix::Cov(A).diag().inverse();
+	std::cout << leo::matrix<double>::Cov(A).diag() << leo::matrix<double>::Cov(A).diag().inverse();
 
-	//std::cout << leo::Matrix::Cor(A);
-
-	std::cout << leo::Cov(A);
-
-	std::cout << leo::Cov_old(A);
-
-/*	leo::matrix<double> test(2, 2);
-	test[0][0] = 1; test[0][1] = 2;
-	test[1][0] = 3; test[1][1] = 4;
-
-	leo::matrix<double> test_T = test.transposition();
-	std::cout << "test:\n" << test << std::endl;
-	std::cout << "test transposed:\n" << test_T << std::endl;
-
-	// Умножение test_T на test
-	leo::matrix<double> test_ATA = test_T(test);
-	std::cout << "testᵀ * test:\n" << test_ATA << std::endl;
-*/
-
+	std::cout << leo::Matrix::Cor(A);
 	
+	std::cout << leo::matrix<double>::Cor(A);
 
 	return 0;
 }

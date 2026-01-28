@@ -4,7 +4,7 @@
 #include <functional>
 #include <stdexcept>
 #include <tuple>
-#include <tuple_traits>
+#include <type_traits>
 #include <utility>
 #include <algorithm>
 #include <iterator>
@@ -829,6 +829,7 @@ namespace leo{
 
 //===============================================================================Applay_function_modul=========================================================================================
 namespace leo{
+/*
 	template<typename T>
 	struct is_iterator_pair{ static constexpr bool value = false; };
 
@@ -843,18 +844,34 @@ namespace leo{
 
 	template<typename Func, typename... Args>
 	auto applay_to_range(Func&& func, Args&&... args){
-		using result_type = decltype( func( std::declval< 
-						typename std::coditional_t< 
-							is_iterator_pair_v<
-								std::decay_t<Args>
-							>, 
-							typename is_iterator_pair<
-								std::decay_t<Args>
-							>::value_type,
-							std::decay_t<Args>
-						>...
-					> ) );
+		//using result_type = decltype( func( std::declval< 
+		//				typename std::conditional_t< 
+		//					is_iterator_pair_v<
+		//						std::decay_t<Args>
+		//					>, 
+		//					typename is_iterator_pair<
+		//						std::decay_t<Args>
+		//					>::value_type,
+		//					std::decay_t<Args>
+		//				>...
+		//			> ) );
+	
 		
+
+		template<typename T>
+		using get_value_type_t = typename std::conditional_t<
+							is_iterator_pair_v<
+								std::decay_t<T>
+							>,
+							typename is_iterator_pair<
+								std::decay_t<T>
+							>::value_type,
+							std::decay_t<T>
+					>;
+
+		using result_type = decltype(std::forward<Func>(func)(std::declval<get_value_type_t<Args>>()...));
+
+	
 		std::vector<result_type> result;
 
 		size_t distance = 0;
@@ -877,7 +894,7 @@ namespace leo{
 
 		result.reserve(distance);
 
-		auto get_value = [](auto&& arg, size_t index) -> decltupe(auto){
+		auto get_value = [](auto&& arg, size_t index) -> decltype(auto){
 			if constexpr (is_iterator_pair_v< std::decay_t< decltype(arg) > >){
 				auto it = arg.first;
 				std::advance(it, index);
@@ -899,32 +916,108 @@ namespace leo{
 	}
 
 
-	template<class T, typename Func, typename... Args>
-	auto applay_to_matrix(Func&& func, Args&&... args, matrix<T> A){
-		using result_type = decltype( func( std::declval<
-                                                typename std::coditional_t<
-                                                        is_iterator_pair_v<
-                                                                std::decay_t<Args>
-                                                        >,
-                                                        typename is_iterator_pair<
-                                                                std::decay_t<Args>
-                                                        >::value_type,
-                                                        std::decay_t<Args>
-                                                >...
-                                        > ) );
+	template<typename T>
+	struct is_function_pointer{ static constexpr bool value = false; };
 
-		std::vector<result_type> res = applay_to_range(func, args...);
+	template<typename Ret, typename... Args>
+	struct is_function_pointer<Ret(*)(Args...)> {
+		static constexpr bool value = true;
+		using return_type = Ret;
+		using args_tuple = std::tuple<Args...>;
+	};
+
+	template<typename T>
+	inline constexpr bool is_function_pointer_v = is_function_pointer<T>::value;
+
+	template<typename T>
+	struct function_resolver{
+
+		template<typename Ret>
+		static auto resolve(Ret(*func)(T)) -> decltype(auto) { return func; }
+		
+		template<class T, typename Func>
+		static auto resolve(Func&& func) -> decltype(auto){ return std::forward<Func>(func); }
+
+	};
+
+
+
+	template<class T, typename Func>
+	auto applay_to_matrix(matrix<T> A, Func&& func) -> decltype(std::forward<Func>(func)(std::declval<T>()), A)
+	{
+
+		auto matrix_pair = std::make_pair(A.h_begin(), A.h_end());
+		
+		using resul_type = decltype(std::forward<Func>(func)(std::declval<T>()));
+		static_assert(std::is_convertible_v<result_type, T>, "Function must returna type convertible to matrix element type");
+
+		auto res = applay_to_range(std::forward<Func>(func), matrix_pair);
 	
 		auto itv = res.begin();		
 
 		for(auto it=A.h_begin(); it!=A.h_end(); ++it){
 			*it = *itv;
-			itv++;
+			++itv;
 		}
 		return A;
 	}
 
+	template<class T, typename Func, typename... Args>
+	matrix<T> applay_to_matrix(matrix<T> A, Func&& func, Args&&... args) -> decltype( std::forwar<Func>(func)( 
+											std::declval<T>(),
+											std::declval<
+												typename std::conditional_t<
+													is_iterator_pair_v<
+														std::decay_t<Args>
+													>,
+													typename is_iterator_pair<
+														std::decay_t<Args>
+													>::value_type,
+													std::decay_t<Args>
+												>...
+											>()
+										), A )
+	{
 
+		auto matrix_pair = std::make_pair(A.h_begin(), A.h_end());
+
+		auto res = applay_to_range(std::forward<Func>(func), matrix_pair, std::forward<Args>(args)...);
+
+		auto itv = res.begin(); 
+
+		for(auto it=A.h_begin(); it!=A.h_end(); ++it){
+			*it = *itv;
+			++itv;
+		}
+		return A;
+	}
+
+	template<class T, typename... FuncArgs>
+	auto applay_to_matrix(matrix<T> A, T(*func)(T)) -> decltype( func(std::declval<T>()), A )
+	{
+		auto wrapper = [func](T x) -> T { return func(x); };
+		return applay_to_matrix(A, wrapper);
+	}
+
+	template<class T, typename Ret, typename... FuncArgs>
+	auto applay_to_matrix(matrix<T> A, T(*func)(FuncArgs...)) -> decltype(func(std::declval<FuncArgs>()...), A)
+	{
+		static_assert(sizeof... (FuncArgs) == 1, "Function must take exectly one argument for matrix operations");
+
+		static_assert(std::is_convertible_v< std::tuple_element_t< 0, std::tuple<FuncArgs...>>, T>, "Function argument must be convertible to matrix element type");
+
+		static_assert(std::is_convertible_v<Ret, T>, "Function return type must be convertible to matrix element type");
+
+		auto wrapper = [func](T x) -> { return static_cast<T>(func(static_cast<FuncArgs>(x)...)); };
+
+		return applay_to_matrix(A, wrapper);
+		
+	}
+
+
+	template<typename T>
+	auto make_math_function(T(*func)(T)) { return [func](T x) -> T { return func(x); }; }
+*/
 }
 
 
@@ -1070,7 +1163,9 @@ namespace Matrix{
 	template<class T>
 	matrix<T> Cor(const matrix<T>& A){
 		matrix<T> covariation = Matrix::Cov(A);
-		matrix<T> invd = covariation.diag().inverse();
+		matrix<T> disp = covariation.diag();
+		for(size_t i=0; i < disp.size_col(); ++i) disp[i][i] = std::sqrt(disp[i][i]);
+		matrix<T> invd = disp.inverse();
 		return invd(covariation(invd));
 	}
 }
@@ -1086,15 +1181,15 @@ namespace Matrix{
 
 
 int main(){
-	leo::matrix<double> A(4, 4);
+	leo::matrix<double> A(3, 3);
 
-	A[0][0] = 1; A[0][1] = 2; A[0][2] = 3; A[0][3] = 3;
+	A[0][0] = 1; A[0][1] = 2; A[0][2] = 3; //A[0][3] = 3;
 
-	A[1][0] = 4; A[1][1] = 5; A[1][2] = 10; A[1][3] = 3;
+	A[1][0] = 4; A[1][1] = 5; A[1][2] = 10; //A[1][3] = 3;
 
-	A[2][0] = 7; A[2][1] = 8; A[2][2] = 9; A[2][3] = 10;
+	A[2][0] = 7; A[2][1] = 8; A[2][2] = 9; //A[2][3] = 10;
 
-	A[3][0] = 20; A[3][1] = 8; A[3][2] = 5; A[3][3] = 3;
+	//A[3][0] = 20; A[3][1] = 8; A[3][2] = 5; A[3][3] = 3;
 
 	std:: cout << A;/* << "\nTransposition:"; << A.transposition();
 
@@ -1102,7 +1197,7 @@ int main(){
 
 	std:: cout << A.inverse();
 
-	std::vector<double> d = { 1, 2, 3, 4 };
+	std::vector<double> d = { 1, 2, 3 };
 
 	std::vector<double> sl = leo::solve(A, d);
 	
@@ -1146,7 +1241,6 @@ int main(){
 	
 	std::cout << leo::matrix<double>::Cor(A);
 
-	std::cout << applay_to_matrix(std::sqrt, std::make_pair(A.h_begin()), A);
 
 	return 0;
 }

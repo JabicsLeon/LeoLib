@@ -58,6 +58,8 @@ namespace leo{
 	};
 
 
+
+
 	//===========================Class_Matrix========================================
 	template<class T>
 	class matrix{
@@ -1341,12 +1343,15 @@ namespace BackFFT{
 
 	struct complex_tag {};
 	struct real_tag {};
+	struct image_tag {};
+
 
 	inline constexpr complex_tag complex{};
 	inline constexpr real_tag real{};
+	inline constexpr image_tag image {};
 
-	template<typename Tag, typename Iterator>
-	auto FFT(Tag tag, Iterator xb, Iterator xe, bool inverse=false)
+	template<typename Iterator>
+	auto FFT(real_tag, Iterator xb, Iterator xe, bool inverse=false)
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
@@ -1356,15 +1361,51 @@ namespace BackFFT{
 		if constexpr (BackFFT::is_complex_v<elem_type>) result = BackFFT::FFT_complex(xb, xe, inverse);
 		else result = BackFFT::FFT_real_front(xb, xe, inverse);
 
-		if constexpr (std::is_same_v<std::decay_t<Tag>, real_tag>) {
-			std::vector<value_type> real_part;
-			real_part.reserve(result.size());
-			for(const auto& x : result){
-				real_part.push_back(x.real());
-			}
-			return real_part;
-		} else return result;
+		std::vector<value_type> real_part;
+		real_part.reserve(result.size());
+		for(const auto& x : result){
+			real_part.push_back(x.real());
+		}
+		return real_part;
 	}
+
+
+	template<typename Iterator>
+	auto FFT(image_tag, Iterator xb, Iterator xe, bool inverse=false)
+	{
+		using elem_type = std::decay_t<decltype(*xb)>;
+		using value_type = scalar_type_t<elem_type>;
+
+		std::vector<std::complex<value_type>> result;
+
+		if constexpr (BackFFT::is_complex_v<elem_type>) result = BackFFT::FFT_complex(xb, xe, inverse);
+		else result = BackFFT::FFT_real_front(xb, xe, inverse);
+
+		std::vector<value_type> image_part;
+		image_part.reserve(result.size());
+		for(const auto& x : result){
+			image_part.push_back(x.imag());
+		}
+		return image_part;
+	}
+
+
+	template<typename Iterator>
+	auto FFT(complex_tag, Iterator xb, Iterator xe, bool inverse=false)
+	{
+		using elem_type = std::decay_t<decltype(*xb)>;
+		using value_type = scalar_type_t<elem_type>;
+
+		std::vector<std::complex<value_type>> result;
+
+		if constexpr (BackFFT::is_complex_v<elem_type>) result = BackFFT::FFT_complex(xb, xe, inverse);
+		else result = BackFFT::FFT_real_front(xb, xe, inverse);
+
+		return result;
+	}
+	
+
+
 	
 }
 
@@ -1390,12 +1431,14 @@ int main(){
 
 	std::vector<std::complex<double>> Front = leo::FFT(leo::complex, A.Column(0).begin(), A.Column(0).end());
 
-	std::vector<double> Back = leo::FFT(leo::real,  Front.begin(), Front.end(), true);
+	std::vector<double> Back_real = leo::FFT(leo::real,  Front.begin(), Front.end(), true);
 
-	std::cout << "Column\tFront\tBack\n";
+	std::vector<double> Back_image = leo::FFT(leo::image, Front.begin(), Front.end(), true);
+
+	std::cout << "\nColumn\tFront\tBack_real\tBack_image\n";
 	auto it = A.Column(0).begin();
 	for(size_t i=0; i < A.size_row(); ++i) {
-		std::cout << *it << "\t" << Front[i] << "\t" << Back[i] << "\n";
+		std::cout << *it << "\t" << Front[i] << "\t" << Back_real[i] << "\t" << Back_image[i] << "\n";
 		++it;
 	}
 	

@@ -1235,8 +1235,6 @@ namespace BackFFT{
 	template<typename Iterator>
 	auto FFT_complex(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
 	{
-		//using result_type = std::decay_t<decltype(*xb)>;
-		
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
 
@@ -1261,8 +1259,6 @@ namespace BackFFT{
 	template<typename Iterator>
 	auto FFT_real_back(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
 	{
-		//using result_type = std::decay_t<decltype(*xb)>;
-
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
 
@@ -1293,8 +1289,6 @@ namespace BackFFT{
 	template<typename Iterator>
 	auto FFT_real_front(Iterator xb, Iterator xe, bool inverse=false)
 	{
-		//using result_type = std::decay_t<decltype(*xb)>;
-
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
 
@@ -1354,8 +1348,6 @@ namespace BackFFT{
 	template<typename Tag, typename Iterator>
 	auto FFT(Tag tag, Iterator xb, Iterator xe, bool inverse=false)
 	{
-		//using value_type = std::decay_t<decltype(*xb)>;
-
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
 		
@@ -1396,29 +1388,17 @@ int main(){
 	
 	std::cout << leo::matrix<double>::Cor(A);
 
-	std::vector<double> et_one = leo::FFT(A.AllColumn().begin(), A.AllColumn().end());
+	std::vector<std::complex<double>> Front = leo::FFT(leo::complex, A.Column(0).begin(), A.Column(0).end());
 
-	std::cout << "\n";
+	std::vector<double> Back = leo::FFT(leo::real,  Front.begin(), Front.end(), true);
 
-	std::vector<double> et_two = leo::FFT(et_one.begin(), et_one.end(), true);
+	std::cout << "Column\tFront\tBack\n";
+	auto it = A.Column(0).begin();
+	for(size_t i=0; i < A.size_row(); ++i) {
+		std::cout << *it << "\t" << Front[i] << "\t" << Back[i] << "\n";
+		++it;
+	}
 	
-	std::cout << "\n";
-
-	for(const auto& it : et_two) std::cout << it << "\t";
-
-	std::cout << "\n";
-
-	std::vector<std::complex<double>> et_thre = leo::FFT(leo::complex, A.AllColumn().begin(), A.AllColumn().end());
-
-	for(const auto& it : et_thre) std::cout << it.real() << "\t";
-
-	std::vector<double> et_f = leo::FFT(leo::real, et_thre.begin(), et_thre.end(), true);
-
-	for(const auto& it : et_f) std::cout << it << "\t";
-
-	//auto test = leo::FFT(leo::real, A.AllColumn().begin(), A.AllColumn().end());
-	//static_assert(std::is_same_v<decltype(test), std::vector<double>>, "FFT(real) must return vector<double>");
-
 
 	return 0;
 }

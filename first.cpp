@@ -66,50 +66,8 @@ namespace leo{
 			size_t col, row, mat;
 			std::vector<std::vector<std::string>> LABELS;
 	public:
-		/*friend matrix<T> operator+<>(const matrix<T>& a, const matrix<T>& b);
-		friend matrix<T> operator+<>(const matrix<T>& a, T b);
-		friend matrix<T> operator+<>(T b, const matrix<T>& a);
-		friend matrix<T> operator-<>(const matrix<T>& a, const matrix<T>& b);
-		friend matrix<T> operator-<>(const matrix<T>& a, T b);
-		friend matrix<T> operator-<>(T b, const matrix<T>& a);
-		friend matrix<T> operator*<>(const matrix<T>& a, T b);
-		friend matrix<T> operator*<>(T b, const matrix<T>& a);*/
 		friend std::ostream& operator<< <>(std::ostream& os, const matrix<T>& m);
-/*	public:
-		class iterator_horizontal;
-		class iterator_vertical;
-	
-		iterator_horizontal h_begin();
-		iterator_horizontal h_end();
 
-		iterator_vertical row_begin();
-		iterator_vertical row_end();
-
-		auto Column(size_t k) const {
-			return ColumnRange{this, k};
-		}
-
-		auto Row(size_t k) const {
-			return RowRange{this, k};
-		}
-
-	private:
-		struct ColumnRange {
-			const matrix<T>* M;
-			size_t col_idx;
-
-			auto begin() { return iterator_vertical(const_cast<matrix<T>*>(M), 0, col_idx); }
-			auto end() { return begin() + M->size_row(); }
-		};
-
-		struct RowRange {
-			const matrix<T>* M;
-			size_t row_idx;
-
-			auto begin() { return iterator_horizontal(const_cast<matrix<T>*>(M), row_idx, 0); }
-			auto end() { return begin() + M->size_col(); }
-		};
-	public: */
 			matrix(size_t r, size_t c) : row(r), col(c) {
 				MATRIX.resize(row, std::vector<T>(col, 0));
 				mat = row * col;
@@ -1256,14 +1214,35 @@ namespace BackFFT{
 		return is_complex_v<ValueType>;
 	}
 
+
+	//////
+	template<typename T>
+        struct scalar_type {
+                using type = T;
+        };
+
+        template<typename T>
+        struct scalar_type<std::complex<T>> {
+                using type = T;
+        };
+
+        template<typename T>
+        using scalar_type_t = typename scalar_type<std::decay_t<T>>::type;
+	///////
+
+
+
 	template<typename Iterator>
 	auto FFT_complex(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
 	{
-		using result_type = std::decay_t<decltype(*xb)>;
+		//using result_type = std::decay_t<decltype(*xb)>;
 		
+		using elem_type = std::decay_t<decltype(*xb)>;
+		using value_type = scalar_type_t<elem_type>;
+
 		size_t n = std::distance(xb, xe);
 
-		std::vector<std::complex<result_type>> res;
+		std::vector<std::complex<value_type>> res;
 		res.reserve(n);
 
 		for(auto it = xb; it != xe; ++it){ 
@@ -1282,24 +1261,27 @@ namespace BackFFT{
 	template<typename Iterator>
 	auto FFT_real_back(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
 	{
-		using result_type = std::decay_t<decltype(*xb)>;
+		//using result_type = std::decay_t<decltype(*xb)>;
+
+		using elem_type = std::decay_t<decltype(*xb)>;
+		using value_type = scalar_type_t<elem_type>;
 
 		size_t n = std::distance(xb, xe);
 			
-		std::vector<std::complex<result_type>> res;
+		std::vector<std::complex<value_type>> res;
 		res.reserve(n);
 
 		for(auto it = xb; it != xe; ++it){
-			res.emplace_back(std::complex<result_type>(*it, 0));
+			res.emplace_back(std::complex<value_type>(*it, 0));
 		}
 
 		size_t N = next_power_of_two(n);
-		res.resize(N, std::complex<result_type>(0, 0));
+		res.resize(N, {});
 
 		BackFFT::FFT(res, inverse);
 		
 	
-		std::vector<result_type> result(n);
+		std::vector<value_type> result(n);
 		for(size_t i=0; i < n; ++i){
 			 result[i] = res[i].real();
 		}
@@ -1311,19 +1293,22 @@ namespace BackFFT{
 	template<typename Iterator>
 	auto FFT_real_front(Iterator xb, Iterator xe, bool inverse=false)
 	{
-		using result_type = std::decay_t<decltype(*xb)>;
+		//using result_type = std::decay_t<decltype(*xb)>;
+
+		using elem_type = std::decay_t<decltype(*xb)>;
+		using value_type = scalar_type_t<elem_type>;
 
 		size_t n = std::distance(xb, xe);
 
-		std::vector<std::complex<result_type>> res;
+		std::vector<std::complex<value_type>> res;
 		res.reserve(n);
 
 		for(auto it = xb; it != xe; ++it){
-			res.emplace_back(std::complex<result_type>(*it, 0));
+			res.emplace_back(std::complex<value_type>(*it, 0));
 		}
 
 		size_t N = next_power_of_two(n);
-		res.resize(N, std::complex<result_type>(0, 0));
+		res.resize(N, {});
 
 		BackFFT::FFT(res, inverse);
 		res.resize(n);
@@ -1345,7 +1330,21 @@ namespace BackFFT{
 		}
 	}
 
-/*
+
+
+	template<typename T>
+	struct scalar_type {
+		using type = T;
+	};
+
+	template<typename T>
+	struct scalar_type<std::complex<T>> {
+		using type = T;
+	};
+
+	template<typename T>
+	using scalar_type_t = typename scalar_type<std::decay_t<T>>::type; 
+
 	struct complex_tag {};
 	struct real_tag {};
 
@@ -1355,11 +1354,14 @@ namespace BackFFT{
 	template<typename Tag, typename Iterator>
 	auto FFT(Tag tag, Iterator xb, Iterator xe, bool inverse=false)
 	{
-		using value_type = std::decay_t<decltype(*xb)>;
+		//using value_type = std::decay_t<decltype(*xb)>;
+
+		using elem_type = std::decay_t<decltype(*xb)>;
+		using value_type = scalar_type_t<elem_type>;
 		
 		std::vector<std::complex<value_type>> result;
 		
-		if constexpr (BackFFT::is_complex_v<value_type>) result = BackFFT::FFT_complex(xb, xe, inverse);
+		if constexpr (BackFFT::is_complex_v<elem_type>) result = BackFFT::FFT_complex(xb, xe, inverse);
 		else result = BackFFT::FFT_real_front(xb, xe, inverse);
 
 		if constexpr (std::is_same_v<std::decay_t<Tag>, real_tag>) {
@@ -1371,7 +1373,7 @@ namespace BackFFT{
 			return real_part;
 		} else return result;
 	}
-*/	
+	
 }
 
 //===============================================================================Test_modul=========================================================================================
@@ -1406,13 +1408,13 @@ int main(){
 
 	std::cout << "\n";
 
-//	std::vector<std::complex<double>> et_thre = leo::FFT(leo::complex, A.AllColumn().begin(), A.AllColumn().end());
+	std::vector<std::complex<double>> et_thre = leo::FFT(leo::complex, A.AllColumn().begin(), A.AllColumn().end());
 
-	//for(const auto& it : et_thre) std::cout << it.real() << "\t";
+	for(const auto& it : et_thre) std::cout << it.real() << "\t";
 
-//	std::vector<double> et_f = leo::FFT(leo::real, et_thre.begin(), et_thre.end(), true);
+	std::vector<double> et_f = leo::FFT(leo::real, et_thre.begin(), et_thre.end(), true);
 
-//	for(const auto& it : et_f) std::cout << it << "\t";
+	for(const auto& it : et_f) std::cout << it << "\t";
 
 	//auto test = leo::FFT(leo::real, A.AllColumn().begin(), A.AllColumn().end());
 	//static_assert(std::is_same_v<decltype(test), std::vector<double>>, "FFT(real) must return vector<double>");

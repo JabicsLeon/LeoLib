@@ -1271,7 +1271,7 @@ namespace BackFFT{
 		}
 
 		size_t N = next_power_of_two(n);
-		res.resize(N, 0);
+		res.resize(N, {});
 
 		BackFFT::FFT(res, inverse);
 		res.resize(n);
@@ -1280,7 +1280,7 @@ namespace BackFFT{
 	}
 
 	template<typename Iterator>
-	auto FFT_real(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
+	auto FFT_real_back(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
 	{
 		using result_type = std::decay_t<decltype(*xb)>;
 
@@ -1298,26 +1298,80 @@ namespace BackFFT{
 
 		BackFFT::FFT(res, inverse);
 		
-		if(inverse){
-			std::vector<result_type> result(n);
-			for(size_t i=0; i < n; ++i){
-				 result[i] = res[i].real();
-			}
+	
+		std::vector<result_type> result(n);
+		for(size_t i=0; i < n; ++i){
+			 result[i] = res[i].real();
+		}
 
-			return result;
-			} else return res;
+		return result;
+	}
+
+
+	template<typename Iterator>
+	auto FFT_real_front(Iterator xb, Iterator xe, bool inverse=false)
+	{
+		using result_type = std::decay_t<decltype(*xb)>;
+
+		size_t n = std::distance(xb, xe);
+
+		std::vector<std::complex<result_type>> res;
+		res.reserve(n);
+
+		for(auto it = xb; it != xe; ++it){
+			res.emplace_back(std::complex<result_type>(*it, 0));
+		}
+
+		size_t N = next_power_of_two(n);
+		res.resize(N, std::complex<result_type>(0, 0));
+
+		BackFFT::FFT(res, inverse);
+		res.resize(n);
+		
+		return res;
 	}
 
 
 }
+
 	template<typename Iterator>
 	auto FFT(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
 	{
 		using value_type = std::decay_t<decltype(*xb)>;
-		if constexpr (!BackFFT::is_complex_v<value_type>) return BackFFT::FFT_real(xb, xe, inverse);
-		else return BackFFT::FFT_complex(xb, xe, inverse);
+		if constexpr (!BackFFT::is_complex_v<value_type>) return BackFFT::FFT_real_back(xb, xe, inverse);
+		else {
+			if(BackFFT::is_complex_v<value_type>) return BackFFT::FFT_complex(xb, xe, inverse);
+			//else BackFFT::FFT_real_front(xb, xe, inverse);
+		}
 	}
-	
+
+/*
+	struct complex_tag {};
+	struct real_tag {};
+
+	inline constexpr complex_tag complex{};
+	inline constexpr real_tag real{};
+
+	template<typename Tag, typename Iterator>
+	auto FFT(Tag tag, Iterator xb, Iterator xe, bool inverse=false)
+	{
+		using value_type = std::decay_t<decltype(*xb)>;
+		
+		std::vector<std::complex<value_type>> result;
+		
+		if constexpr (BackFFT::is_complex_v<value_type>) result = BackFFT::FFT_complex(xb, xe, inverse);
+		else result = BackFFT::FFT_real_front(xb, xe, inverse);
+
+		if constexpr (std::is_same_v<std::decay_t<Tag>, real_tag>) {
+			std::vector<value_type> real_part;
+			real_part.reserve(result.size());
+			for(const auto& x : result){
+				real_part.push_back(x.real());
+			}
+			return real_part;
+		} else return result;
+	}
+*/	
 }
 
 //===============================================================================Test_modul=========================================================================================
@@ -1339,6 +1393,30 @@ int main(){
 	std::cout << leo::Matrix::Cor(A);
 	
 	std::cout << leo::matrix<double>::Cor(A);
+
+	std::vector<double> et_one = leo::FFT(A.AllColumn().begin(), A.AllColumn().end());
+
+	std::cout << "\n";
+
+	std::vector<double> et_two = leo::FFT(et_one.begin(), et_one.end(), true);
+	
+	std::cout << "\n";
+
+	for(const auto& it : et_two) std::cout << it << "\t";
+
+	std::cout << "\n";
+
+//	std::vector<std::complex<double>> et_thre = leo::FFT(leo::complex, A.AllColumn().begin(), A.AllColumn().end());
+
+	//for(const auto& it : et_thre) std::cout << it.real() << "\t";
+
+//	std::vector<double> et_f = leo::FFT(leo::real, et_thre.begin(), et_thre.end(), true);
+
+//	for(const auto& it : et_f) std::cout << it << "\t";
+
+	//auto test = leo::FFT(leo::real, A.AllColumn().begin(), A.AllColumn().end());
+	//static_assert(std::is_same_v<decltype(test), std::vector<double>>, "FFT(real) must return vector<double>");
+
 
 	return 0;
 }

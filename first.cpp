@@ -57,6 +57,11 @@ namespace leo{
 		mat,
 	};
 
+	struct Rows_tag {};
+	struct Cols_tag {};
+
+	inline constexpr Rows_tag Rows {};
+	inline constexpr Cols_tag Cols {};
 
 
 
@@ -143,6 +148,10 @@ namespace leo{
 			size_t size_row() const { return row; }
 
 			size_t size() const { return mat; }
+
+			size_t size(Cols_tag) { return col; }
+
+			size_t size(Rows_tag) { return row; }
 			
 	public:
                 class iterator_horizontal;
@@ -1026,6 +1035,10 @@ namespace leo{
 	}
 
 
+	template<typename T>
+	auto MathExcept(std::vector<T> X){	return MathExcept(X.begin(), X.end());	}
+
+
 	template<class Iterator>
 	auto RMS(Iterator start, Iterator end){
 		if(start == end) throw std::invalid_argument("RMS: empty datum!");
@@ -1037,6 +1050,12 @@ namespace leo{
 		return std::sqrt(result);
 		
 	}
+
+
+	template<typename T>
+	auto RMS(std::vector<T> X){	return RMS(X.begin(), X.end());	}
+
+
 
 	template<class Iterator>
 	auto Variation(Iterator start, Iterator end){
@@ -1053,6 +1072,10 @@ namespace leo{
 
 		return RMS(res.begin(), res.end());
 	}
+
+
+	template<typename T>
+	auto Variation(std::vector<T> X){	return Variation(X.begin(), X.end());	}
 
 
 	template<class Iterator1, class Iterator2>
@@ -1078,23 +1101,41 @@ namespace leo{
 		return sum;
 	}
 
+	template<typename T1, typename T2>
+	auto CCF(std::vector<T1> f, std::vector<T2> g, int tau){	return  CCF(f.begin(), f.end(), g.begin(), g.end(), tau);	}
+
+
 	template<class Iterator1, class Iterator2>
-	std::vector<double> CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge){
+	std::vector<double> CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, bool natural=false){
 		auto f_dist = std::distance(fb, fe);
 		auto g_dist = std::distance(gb, ge);
 		std::vector<double> result;
-		result.reserve(f_dist + g_dist - 1);
-		for(int lag = -(g_dist-1); lag <= (f_dist - 1); ++lag){
+		if(natural) result.reserve(f_dist);
+		else result.reserve(f_dist + g_dist - 1);
+		int start_lag = -(g_dist-1);
+		int end_lag = (f_dist - 1);
+		if(natural) start_lag = 0;
+		for(int lag = start_lag; lag <= end_lag; ++lag){
 			result.emplace_back(CCF(fb, fe, gb, ge, lag));
 		}
 		return result;
 	}
+
+
+	template<typename T1, typename T2>
+	std::vector<double> CCF(std::vector<T1> f, std::vector<T2> g, bool natural=false){	return  CCF(f.begin(), f.end(), g.begin(), g.end(), natural);	}
 
 	
 	template<class Iterator>
 	auto ACF(Iterator fb, Iterator fe, int tau){
 		return CCF(fb, fe, fb, fe, tau);
 	}
+
+
+	template<typename T1>
+	auto ACF(std::vector<T1> f, int tau) {	return CCF(f.begin(), f.end(), f.begin(), f.end(), tau);	}
+
+
 
 	template<class Iterator>
 	auto /*std::vector<double>*/ ACF(Iterator fb, Iterator fe) -> std::vector<typename std::iterator_traits<Iterator>::value_type>
@@ -1109,6 +1150,12 @@ namespace leo{
 		}
 		return result;
 	}
+
+
+	template<typename T1>
+	auto ACF(std::vector<T1> f) {	return ACF(f.begin(), f.end());	}
+
+
 
 namespace Matrix{
 	template<class Iterator>
@@ -1127,6 +1174,9 @@ namespace Matrix{
 	
 		return A;
 	}
+
+	template<typename T1>
+	auto ACF(std::vector<T1> f) {   return Matrix::ACF(f.begin(), f.end());	}
 
 	template<class T>
 	matrix<T> Cov(matrix<T> A){
@@ -1405,6 +1455,12 @@ namespace BackFFT{
 	}
 	
 
+	template<typename Tag, typename T>
+	auto FFT(Tag tag, std::vector<T> X, bool inverse=false, size_t full=0){	return FFT(tag, X.begin(), X.end(), inverse, full);	}
+
+	template<typename T>
+	auto FFT(std::vector<T> X, bool inverse=false, size_t full=0){	return FFT(X.begin(), X.end(), inverse, full);	}
+
 
 	template<typename Iterator1, typename Iterator2>
 	auto ConvolveFFT(Iterator1 Ab, Iterator1 Ae, Iterator2 Bb, Iterator2 Be)
@@ -1471,8 +1527,49 @@ namespace BackFFT{
 		return Res;
 	}
 
-	
+
+	template<typename T1, typename T2>
+	auto Convolve(std::vector<T1> F, std::vector<T2> G){
+		return Convolve(F.begin(), F.end(), G.begin(), G.end());
+	}
+
+	template<typename T1, typename T2>
+	auto ConvolveFFT(std::vector<T1> F, std::vector<T2> G){
+		return ConvolveFFT(F.begin(), F.end(), G.begin(), G.end());
+	}
+
 }
+
+//===============================================================================Filters_modul=========================================================================================
+
+namespace leo{
+	
+
+	template<typename Iterator1, typename Iterator2>
+	auto Filter_Kolmogorow_Winer(Iterator1 Sb, Iterator1 Se, Iterator2 ESb, Iterator2 ESe){
+		auto ccf = CCF(Sb, Se, ESb, ESe);
+		auto M = Matrix::ACF(Sb, Se).inverse();
+		ccf.resize(M.size_col());
+		auto h_filter = M( ccf );
+		return ConvolveFFT(Sb, Se, h_filter.begin(), h_filter.end());
+	}
+
+	template<typename T1, typename T2>
+	auto Filter_Kolmogorow_Winer(std::vector<T1> signal, std::vector<T2> excepted_signal){
+		return Filter_Kolmogorow_Winer(signal.begin(), signal.end(), excepted_signal.begin(), excepted_signal.end()); 
+	}
+
+	/*template<typename Iterator1, typename Iterator2>
+	auto Filter_Consistent(Iterator1 Sb, Iterator1 Se, Iterator2 ESb, Iterator2 ESe){
+		auto ccf = CCF(Sb, Se, ESb, ESe);
+		auto M = Matrix::ACF(Sb, Se).inverse();
+		auto h_filter = M( ccf );
+		auto h_opt = 
+	}*/
+
+
+}
+
 
 //===============================================================================Test_modul=========================================================================================
 
@@ -1521,7 +1618,25 @@ int main(){
 	for(auto it : conv_) std::cout << it << " ";
 	std::cout << "\n" << "size conv_: " << conv_.size() << "\n";
 
+	std::vector<double> beta(A.size_row(), 0);
 
+	beta[0] = 1;
+
+	leo::matrix<double> M = leo::Matrix::ACF(A.AllRow().begin(), A.AllRow().end());
+
+	std::cout << "\n";
+        for(auto it : A.AllRow()) std::cout << it << " ";
+	std::cout << "\n" << "size signal: " << A.size() << "\n";
+
+
+	std::cout << "Size of past matrix: " << A.size() << "\nSize of matrix col: " << M.size_col() << "\n" << M;
+
+
+	std::vector<double> FKW = Filter_Kolmogorow_Winer(A.AllRow().begin(), A.AllRow().end(), beta.begin(),beta.end());
+
+	std::cout << "\n";
+	for(auto it : FKW) std::cout << it << " ";
+	std::cout << "\n" << "size FKW: " << FKW.size() << "\n";
 
 
 	return 0;

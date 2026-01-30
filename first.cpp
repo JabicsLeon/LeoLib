@@ -1235,7 +1235,7 @@ namespace BackFFT{
 
 
 	template<typename Iterator>
-	auto FFT_complex(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
+	auto FFT_complex(Iterator xb, Iterator xe, bool inverse=false, size_t full=0)// -> std::vector<decltype(*xb)>
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
@@ -1253,13 +1253,13 @@ namespace BackFFT{
 		res.resize(N, {});
 
 		BackFFT::FFT(res, inverse);
-		res.resize(n);
+		if(!full) res.resize(n);
 		
 		return res;
 	}
 
 	template<typename Iterator>
-	auto FFT_real_back(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
+	auto FFT_real_back(Iterator xb, Iterator xe, bool inverse=false, size_t full=0)// -> std::vector<decltype(*xb)>
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
@@ -1279,17 +1279,18 @@ namespace BackFFT{
 		BackFFT::FFT(res, inverse);
 		
 	
-		std::vector<value_type> result(n);
-		for(size_t i=0; i < n; ++i){
+		std::vector<value_type> result(N);
+		for(size_t i=0; i < N; ++i){
 			 result[i] = res[i].real();
 		}
+		if(!full) result.resize(n);
 
 		return result;
 	}
 
 
 	template<typename Iterator>
-	auto FFT_real_front(Iterator xb, Iterator xe, bool inverse=false)
+	auto FFT_real_front(Iterator xb, Iterator xe, bool inverse=false, size_t full=0)
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
@@ -1307,7 +1308,7 @@ namespace BackFFT{
 		res.resize(N, {});
 
 		BackFFT::FFT(res, inverse);
-		res.resize(n);
+		if(!full) res.resize(n);
 		
 		return res;
 	}
@@ -1316,13 +1317,12 @@ namespace BackFFT{
 }
 
 	template<typename Iterator>
-	auto FFT(Iterator xb, Iterator xe, bool inverse=false)// -> std::vector<decltype(*xb)>
+	auto FFT(Iterator xb, Iterator xe, bool inverse=false, size_t full=0)// -> std::vector<decltype(*xb)>
 	{
 		using value_type = std::decay_t<decltype(*xb)>;
-		if constexpr (!BackFFT::is_complex_v<value_type>) return BackFFT::FFT_real_back(xb, xe, inverse);
+		if constexpr (!BackFFT::is_complex_v<value_type>) return BackFFT::FFT_real_back(full, xb, xe, inverse);
 		else {
-			if(BackFFT::is_complex_v<value_type>) return BackFFT::FFT_complex(xb, xe, inverse);
-			//else BackFFT::FFT_real_front(xb, xe, inverse);
+			if(BackFFT::is_complex_v<value_type>) return BackFFT::FFT_complex(full, xb, xe, inverse);
 		}
 	}
 
@@ -1351,15 +1351,15 @@ namespace BackFFT{
 	inline constexpr image_tag image {};
 
 	template<typename Iterator>
-	auto FFT(real_tag, Iterator xb, Iterator xe, bool inverse=false)
+	auto FFT(real_tag, Iterator xb, Iterator xe, bool inverse=false, size_t full=0)
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
 		
 		std::vector<std::complex<value_type>> result;
 		
-		if constexpr (BackFFT::is_complex_v<elem_type>) result = BackFFT::FFT_complex(xb, xe, inverse);
-		else result = BackFFT::FFT_real_front(xb, xe, inverse);
+		if constexpr (BackFFT::is_complex_v<elem_type>) result = BackFFT::FFT_complex(xb, xe, inverse, full);
+		else result = BackFFT::FFT_real_front(xb, xe, inverse, full);
 
 		std::vector<value_type> real_part;
 		real_part.reserve(result.size());
@@ -1371,15 +1371,15 @@ namespace BackFFT{
 
 
 	template<typename Iterator>
-	auto FFT(image_tag, Iterator xb, Iterator xe, bool inverse=false)
+	auto FFT(image_tag, Iterator xb, Iterator xe, bool inverse=false, size_t full=0)
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
 
 		std::vector<std::complex<value_type>> result;
 
-		if constexpr (BackFFT::is_complex_v<elem_type>) result = BackFFT::FFT_complex(xb, xe, inverse);
-		else result = BackFFT::FFT_real_front(xb, xe, inverse);
+		if constexpr (BackFFT::is_complex_v<elem_type>) result = BackFFT::FFT_complex(xb, xe, inverse, full);
+		else result = BackFFT::FFT_real_front(xb, xe, inverse, full);
 
 		std::vector<value_type> image_part;
 		image_part.reserve(result.size());
@@ -1391,20 +1391,85 @@ namespace BackFFT{
 
 
 	template<typename Iterator>
-	auto FFT(complex_tag, Iterator xb, Iterator xe, bool inverse=false)
+	auto FFT(complex_tag, Iterator xb, Iterator xe, bool inverse=false, size_t full=0)
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
 
 		std::vector<std::complex<value_type>> result;
 
-		if constexpr (BackFFT::is_complex_v<elem_type>) result = BackFFT::FFT_complex(xb, xe, inverse);
-		else result = BackFFT::FFT_real_front(xb, xe, inverse);
+		if constexpr (BackFFT::is_complex_v<elem_type>) result = BackFFT::FFT_complex(xb, xe, inverse, full);
+		else result = BackFFT::FFT_real_front(xb, xe, inverse, full);
 
 		return result;
 	}
 	
 
+
+	template<typename Iterator1, typename Iterator2>
+	auto ConvolveFFT(Iterator1 Ab, Iterator1 Ae, Iterator2 Bb, Iterator2 Be)
+	{
+		using A_elem_type = std::decay_t<decltype(*Ab)>;
+		using A_scalar_type = scalar_type_t<A_elem_type>;
+		using B_elem_type = std::decay_t<decltype(*Bb)>;
+		using B_scalar_type = scalar_type_t<B_elem_type>;
+		using result_elem_type = decltype( std::declval<A_elem_type>() * std::declval<B_elem_type>() );
+		using result_scalar_type = decltype( std::declval<A_scalar_type>() * std::declval<B_scalar_type>() );
+
+		size_t NA = std::distance(Ab, Ae);
+		size_t NB = std::distance(Bb, Be);
+		size_t N = 1;
+		size_t N_cor = NA + NB - 1;
+
+		while(N < NA + NB - 1) N<<=1;
+
+		std::vector<std::complex<A_scalar_type>> F1(N, 0);
+		std::vector<std::complex<B_scalar_type>> F2(N, 0);
+
+		for(size_t i=0; i < NA; ++i) F1[i] = *(Ab + i);
+		for(size_t i=0; i < NB; ++i) F2[i] = *(Bb + i);
+
+		BackFFT::FFT(F1);
+		BackFFT::FFT(F2);
+
+		for(size_t i=0; i < N; ++i) F1[i] *= F2[i];
+
+		BackFFT::FFT(F1, true);
+
+		F1.resize(N_cor);
+
+		if constexpr (BackFFT::is_complex_v<result_elem_type>) return F1;
+		else {
+			std::vector<result_scalar_type> real_part(N_cor, 0);
+			for (size_t i=0; i < N_cor; ++i) real_part[i] = F1[i].real();
+			return real_part;
+		}
+	}
+
+
+
+	template<typename Iterator1, typename Iterator2>
+	auto Convolve(Iterator1 Ab, Iterator1 Ae, Iterator2 Bb, Iterator2 Be)
+	{	
+		using A_elem_type = std::decay_t<decltype(*Ab)>;
+		using B_elem_type = std::decay_t<decltype(*Bb)>;
+		using result_elem_type = decltype( std::declval<A_elem_type>() * std::declval<B_elem_type>() );
+
+		size_t NA = std::distance(Ab, Ae);
+		size_t NB = std::distance(Bb, Be);
+		size_t N = NA + NB - 1;
+
+		std::vector<result_elem_type> Res(N, {});
+
+		for(auto it_a = Ab; it_a != Ae; ++it_a){
+			for(auto it_b = Bb; it_b != Be; ++it_b){
+				size_t i = std::distance(Ab, it_a) + std::distance(Bb, it_b);// - 2;
+				Res[i] += *it_a * *it_b;
+			}
+		}
+
+		return Res;
+	}
 
 	
 }
@@ -1442,6 +1507,22 @@ int main(){
 		++it;
 	}
 	
+
+	std::vector<double> conv = leo::ConvolveFFT(A.Column(0).begin(), A.Column(0).end(), A.Row(0).begin(), A.Row(0).end());
+	
+	std::cout << "\n";
+	for(auto it : conv) std::cout << it << " ";
+	std::cout << "\n" << "size conv: " << conv.size() << "\n";
+	
+
+	std::vector<double> conv_ = leo::Convolve(A.Column(0).begin(), A.Column(0).end(), A.Row(0).begin(), A.Row(0).end());
+
+	std::cout << "\n";
+	for(auto it : conv_) std::cout << it << " ";
+	std::cout << "\n" << "size conv_: " << conv_.size() << "\n";
+
+
+
 
 	return 0;
 }

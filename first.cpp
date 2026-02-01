@@ -20,6 +20,7 @@
 
 
 //===============================================================================Matrix_modul=========================================================================================
+
 namespace leo{
 
 	template<class T> class matrix;
@@ -62,6 +63,7 @@ namespace leo{
 
 	inline constexpr Rows_tag Rows {};
 	inline constexpr Cols_tag Cols {};
+
 
 
 
@@ -480,12 +482,16 @@ namespace leo{
 			}
 			
 			matrix<T> inverse(){
+				if(!is_square()) throw std::logic_error("Inverse: matrix is not square!");
 				if(size() <= 9) return (1 / det()) * attached();
 				else return Method_Gauss(*this);
 			}
 
 
-
+			T get_value(){
+				if(mat != 1) throw std::logic_error("Class matrix, get_value - matrix not scalar!");
+				return MATRIX[0][0];
+			}
 
 			
 			static matrix<T> Cov(matrix<T> A){
@@ -1079,34 +1085,36 @@ namespace leo{
 
 
 	template<class Iterator1, class Iterator2>
-	auto CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, int tau){
+	auto CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, int tau, bool norm=false){
 		if(fb == fe || gb == ge) return 0.0;
 		auto sum = 0.0;
-		int count = 0;
 		auto Mf = MathExcept(fb, fe);
 		auto Mg = MathExcept(gb, ge);
-		int tau_f = 0;
-		int tau_g = 0;
-		if (tau >= 0) tau_g = tau;
-		else tau_f = -tau;
-		Iterator1 it_f = fb + tau_f;
-		Iterator2 it_g = gb + tau_g;
-		while( it_f != fe && it_g != ge){
-			sum += (*it_f - Mf) * (*it_g - Mg);
-			it_f++;
-			it_g++;
-			count++;
+		auto f_dist = std::distance(fb, fe);
+		auto g_dist = std::distance(gb, ge);
+		int top = std::min(f_dist - 1, g_dist - 1 - tau);
+		int bot = std::max(0, - tau);
+		int dist = top - bot + 1;
+		if(bot > top) return 0.0;
+		for(int i = bot; i <= top; ++i){
+			//std::cout << "My tau = " << tau << ", my t = " << i << ", my f = " << *(fb + i) << " my g = " << *(gb  + i + tau) << "\n";
+			auto f_el = *(fb + i);
+			auto g_el = *(gb  + i + tau);
+			if(norm) { f_el -= Mf; g_el -= Mg; }
+			sum += f_el * g_el;
 		}
-		if (count != 0) return sum/count;
+		if(norm && dist != 0) return sum/dist;
 		return sum;
 	}
 
+
+
 	template<typename T1, typename T2>
-	auto CCF(std::vector<T1> f, std::vector<T2> g, int tau){	return  CCF(f.begin(), f.end(), g.begin(), g.end(), tau);	}
+	auto CCF(std::vector<T1> f, std::vector<T2> g, int tau,  bool norm=false){	return  CCF(f.begin(), f.end(), g.begin(), g.end(), tau, norm);	}
 
 
 	template<class Iterator1, class Iterator2>
-	std::vector<double> CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, bool natural=false){
+	std::vector<double> CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, bool norm=false, bool natural=false){
 		auto f_dist = std::distance(fb, fe);
 		auto g_dist = std::distance(gb, ge);
 		std::vector<double> result;
@@ -1116,14 +1124,15 @@ namespace leo{
 		int end_lag = (f_dist - 1);
 		if(natural) start_lag = 0;
 		for(int lag = start_lag; lag <= end_lag; ++lag){
-			result.emplace_back(CCF(fb, fe, gb, ge, lag));
+			result.emplace_back(CCF(fb, fe, gb, ge, lag, norm));
 		}
 		return result;
 	}
 
 
+
 	template<typename T1, typename T2>
-	std::vector<double> CCF(std::vector<T1> f, std::vector<T2> g, bool natural=false){	return  CCF(f.begin(), f.end(), g.begin(), g.end(), natural);	}
+	std::vector<double> CCF(std::vector<T1> f, std::vector<T2> g, bool norm=false, bool natural=false){	return  CCF(f.begin(), f.end(), g.begin(), g.end(), norm, natural);	}
 
 	
 	template<class Iterator>
@@ -1285,7 +1294,7 @@ namespace BackFFT{
 
 
 	template<typename Iterator>
-	auto FFT_complex(Iterator xb, Iterator xe, bool inverse=false, size_t full=0)// -> std::vector<decltype(*xb)>
+	auto FFT_complex(Iterator xb, Iterator xe, bool inverse=false, bool full=0)// -> std::vector<decltype(*xb)>
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
@@ -1309,7 +1318,7 @@ namespace BackFFT{
 	}
 
 	template<typename Iterator>
-	auto FFT_real_back(Iterator xb, Iterator xe, bool inverse=false, size_t full=0)// -> std::vector<decltype(*xb)>
+	auto FFT_real_back(Iterator xb, Iterator xe, bool inverse=false, bool full=0)// -> std::vector<decltype(*xb)>
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
@@ -1340,7 +1349,7 @@ namespace BackFFT{
 
 
 	template<typename Iterator>
-	auto FFT_real_front(Iterator xb, Iterator xe, bool inverse=false, size_t full=0)
+	auto FFT_real_front(Iterator xb, Iterator xe, bool inverse=false, bool full=0)
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
@@ -1367,7 +1376,7 @@ namespace BackFFT{
 }
 
 	template<typename Iterator>
-	auto FFT(Iterator xb, Iterator xe, bool inverse=false, size_t full=0)// -> std::vector<decltype(*xb)>
+	auto FFT(Iterator xb, Iterator xe, bool inverse=false, bool full=0)// -> std::vector<decltype(*xb)>
 	{
 		using value_type = std::decay_t<decltype(*xb)>;
 		if constexpr (!BackFFT::is_complex_v<value_type>) return BackFFT::FFT_real_back(full, xb, xe, inverse);
@@ -1401,7 +1410,7 @@ namespace BackFFT{
 	inline constexpr image_tag image {};
 
 	template<typename Iterator>
-	auto FFT(real_tag, Iterator xb, Iterator xe, bool inverse=false, size_t full=0)
+	auto FFT(real_tag, Iterator xb, Iterator xe, bool inverse=false, bool full=0)
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
@@ -1421,7 +1430,7 @@ namespace BackFFT{
 
 
 	template<typename Iterator>
-	auto FFT(image_tag, Iterator xb, Iterator xe, bool inverse=false, size_t full=0)
+	auto FFT(image_tag, Iterator xb, Iterator xe, bool inverse=false, bool full=0)
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
@@ -1441,7 +1450,7 @@ namespace BackFFT{
 
 
 	template<typename Iterator>
-	auto FFT(complex_tag, Iterator xb, Iterator xe, bool inverse=false, size_t full=0)
+	auto FFT(complex_tag, Iterator xb, Iterator xe, bool inverse=false, bool full=0)
 	{
 		using elem_type = std::decay_t<decltype(*xb)>;
 		using value_type = scalar_type_t<elem_type>;
@@ -1456,10 +1465,10 @@ namespace BackFFT{
 	
 
 	template<typename Tag, typename T>
-	auto FFT(Tag tag, std::vector<T> X, bool inverse=false, size_t full=0){	return FFT(tag, X.begin(), X.end(), inverse, full);	}
+	auto FFT(Tag tag, std::vector<T> X, bool inverse=false, bool full=0){	return FFT(tag, X.begin(), X.end(), inverse, full);	}
 
 	template<typename T>
-	auto FFT(std::vector<T> X, bool inverse=false, size_t full=0){	return FFT(X.begin(), X.end(), inverse, full);	}
+	auto FFT(std::vector<T> X, bool inverse=false, bool full=0){	return FFT(X.begin(), X.end(), inverse, full);	}
 
 
 	template<typename Iterator1, typename Iterator2>
@@ -1472,8 +1481,8 @@ namespace BackFFT{
 		using result_elem_type = decltype( std::declval<A_elem_type>() * std::declval<B_elem_type>() );
 		using result_scalar_type = decltype( std::declval<A_scalar_type>() * std::declval<B_scalar_type>() );
 
-		size_t NA = std::distance(Ab, Ae);
-		size_t NB = std::distance(Bb, Be);
+		auto NA = std::distance(Ab, Ae);
+		auto NB = std::distance(Bb, Be);
 		size_t N = 1;
 		size_t N_cor = NA + NB - 1;
 
@@ -1538,6 +1547,48 @@ namespace BackFFT{
 		return ConvolveFFT(F.begin(), F.end(), G.begin(), G.end());
 	}
 
+
+	template<typename Iterator1, typename Iterator2>	
+	auto CCF_FFT(Iterator1 Ab, Iterator1 Ae, Iterator2 Bb, Iterator2 Be){
+		using A_elem_type = std::decay_t<decltype(*Ab)>;
+		using A_scalar_type = scalar_type_t<A_elem_type>;
+		using B_elem_type = std::decay_t<decltype(*Bb)>;
+		using B_scalar_type = scalar_type_t<B_elem_type>;
+		using result_elem_type = decltype( std::declval<A_elem_type>() * std::declval<B_elem_type>() );
+		using result_scalar_type = decltype( std::declval<A_scalar_type>() * std::declval<B_scalar_type>() );
+
+		auto NA = std::distance(Ab, Ae);
+		auto NB = std::distance(Bb, Be);
+		size_t N = 1;
+		size_t N_cor = NA + NB - 1;
+
+		while(N < NA + NB - 1) N<<=1;
+
+		std::vector<std::complex<A_scalar_type>> F1(N, 0);
+		std::vector<std::complex<B_scalar_type>> F2(N, 0);
+
+		for(size_t i=0; i < NA; ++i) F1[i] = *(Ab + i);
+		for(size_t i=0; i < NB; ++i) F2[NB - 1 - i] = *(Bb + i);
+
+		BackFFT::FFT(F1);
+		BackFFT::FFT(F2);
+
+		for(size_t i=0; i < N; ++i) F1[i] *= F2[i];
+	
+		BackFFT::FFT(F1, true);
+
+		F1.resize(N_cor);
+
+		if constexpr (BackFFT::is_complex_v<result_elem_type>) return F1;
+		else {
+			std::vector<result_scalar_type> real_part(N_cor, 0);
+			for (size_t i=0; i < N_cor; ++i) real_part[i] = F1[i].real();
+			return real_part;
+		}
+		
+	}
+
+
 }
 
 //===============================================================================Filters_modul=========================================================================================
@@ -1546,25 +1597,60 @@ namespace leo{
 	
 
 	template<typename Iterator1, typename Iterator2>
-	auto Filter_Kolmogorow_Winer(Iterator1 Sb, Iterator1 Se, Iterator2 ESb, Iterator2 ESe){
+	auto Filter_Kolmogorow_Winer(Iterator1 Sb, Iterator1 Se, Iterator2 ESb, Iterator2 ESe, bool filtiring=false){
 		auto ccf = CCF(Sb, Se, ESb, ESe);
 		auto M = Matrix::ACF(Sb, Se).inverse();
 		ccf.resize(M.size_col());
 		auto h_filter = M( ccf );
+		if (filtiring) return ConvolveFFT(Sb, Se, h_filter.begin(), h_filter.end());
+		else return h_filter;
+	}
+
+
+	
+
+
+	template<typename T1, typename T2>
+	auto Filter_Kolmogorow_Winer(std::vector<T1> signal, std::vector<T2> excepted_signal, bool filtiring=false){
+		return Filter_Kolmogorow_Winer(signal.begin(), signal.end(), excepted_signal.begin(), excepted_signal.end(), filtiring); 
+	}
+
+	template<typename Iterator1, typename Iterator2>
+	auto Filter_Consistent(Iterator1 Noise_b, Iterator1 Noise_e, Iterator2 ESb, Iterator2 ESe){
+		using signal_type = std::decay_t<decltype(*Noise_b)>;
+
+		auto ccf = CCF(Noise_b, Noise_e, ESb, ESe);
+		auto M = Matrix::ACF(Noise_b, Noise_e).inverse();
+		M.resize(M.size_col(), ccf.size);
+		auto h_filter = M( ccf );
+		matrix<signal_type> S(1, h_filter.size());
+		for(size_t i=0; i < h_filter.size(); ++i) S[0][i] =  h_filter[i];
+		auto h_norm = S(h_filter).get_value();
+		for(size_t i=0; i < h_filter.size(); ++i) h_filter[i] /= h_norm;
+		return h_filter;
+	}
+
+	template<typename Iterator1, typename Iterator2, typename Iterator3>
+	auto Filter_Consistent(Iterator1 Noise_b, Iterator1 Noise_e, Iterator2 ESb, Iterator2 ESe, Iterator3 Sb, Iterator3 Se){
+		auto h_filter = Filter_Consistent(Noise_b, Noise_e, ESb, ESe);
 		return ConvolveFFT(Sb, Se, h_filter.begin(), h_filter.end());
 	}
 
 	template<typename T1, typename T2>
-	auto Filter_Kolmogorow_Winer(std::vector<T1> signal, std::vector<T2> excepted_signal){
-		return Filter_Kolmogorow_Winer(signal.begin(), signal.end(), excepted_signal.begin(), excepted_signal.end()); 
+        auto Filter_Consistent(std::vector<T1> noise, std::vector<T2> excepted_signal){
+		return Filter_Consistent(noise.begin(), noise.end(), excepted_signal.begin(), excepted_signal.end());
+	}
+
+	template<typename T1, typename T2, typename T3>
+	auto Filter_Consistent(std::vector<T1> noise, std::vector<T2> excepted_signal, std::vector<T3> signal){
+		return Filter_Consistent(signal.begin(), signal.end(), excepted_signal.begin(), excepted_signal.end(), signal.begin(), signal.end());
 	}
 
 	/*template<typename Iterator1, typename Iterator2>
-	auto Filter_Consistent(Iterator1 Sb, Iterator1 Se, Iterator2 ESb, Iterator2 ESe){
-		auto ccf = CCF(Sb, Se, ESb, ESe);
-		auto M = Matrix::ACF(Sb, Se).inverse();
-		auto h_filter = M( ccf );
-		auto h_opt = 
+	auto Filter_Energy(Iterator1 Noise_b, Iterator1 Noise_e, Iterator2 ESb, Iterator2 ESe){
+		using signal_type = std::decay_t<decltype(*Sb)>;
+
+		
 	}*/
 
 
@@ -1631,13 +1717,33 @@ int main(){
 
 	std::cout << "Size of past matrix: " << A.size() << "\nSize of matrix col: " << M.size_col() << "\n" << M;
 
+	
+	std::cout << "\n";
+	for(auto it : A.AllRow()) std::cout << it << " ";
+	std::cout << "\n" << "size signal: " << A.size() << "\n";
 
-	std::vector<double> FKW = Filter_Kolmogorow_Winer(A.AllRow().begin(), A.AllRow().end(), beta.begin(),beta.end());
+	std::cout << "\n";
+	for(auto it : beta) std::cout << it << " ";
+	std::cout << "\n" << "size beta: " << beta.size() << "\n";
+
+	std::vector<double> FKW = Filter_Kolmogorow_Winer(A.AllRow().begin(), A.AllRow().end(), beta.begin(),beta.end(), true);
 
 	std::cout << "\n";
 	for(auto it : FKW) std::cout << it << " ";
 	std::cout << "\n" << "size FKW: " << FKW.size() << "\n";
 
+
+	leo::matrix<double> K = A + 3;
+
+	std::cout << K;
+
+	std::vector<double> ccf = leo::CCF(A.AllRow().begin(), A.AllRow().end(), beta.begin(),beta.end(), true);
+
+	std::vector<double> ccf_fft = leo::CCF_FFT(A.AllRow().begin(), A.AllRow().end(), beta.begin(),beta.end());
+
+	std::cout << "ccf\tccf_fft\n";
+	for(size_t i=0; i < ccf.size(); ++i) std::cout << ccf[i] << "\t" << ccf_fft[i] << "\n";
+	std::cout << "size ccf = " << ccf.size() << "\tsize ccf_fft = " << ccf_fft.size() << "\n";
 
 	return 0;
 }

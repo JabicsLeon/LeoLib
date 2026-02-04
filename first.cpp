@@ -1084,8 +1084,8 @@ namespace leo{
 	auto Variation(std::vector<T> X){	return Variation(X.begin(), X.end());	}
 
 
-	template<class Iterator1, class Iterator2>
-	auto CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, int tau, bool norm=false){
+/*	template<class Iterator1, class Iterator2>
+	auto CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, int tau, bool norm=true){
 		if(fb == fe || gb == ge) return 0.0;
 		auto sum = 0.0;
 		auto Mf = MathExcept(fb, fe);
@@ -1106,6 +1106,38 @@ namespace leo{
 		if(norm && dist != 0) return sum/dist;
 		return sum;
 	}
+*/
+
+
+	template<class Iterator1, class Iterator2>
+	auto CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, int tau, bool norm=true){
+		if(fb == fe || gb == ge) return 0.0;
+		auto sum = 0.0;
+		auto Mf = MathExcept(fb, fe);
+		auto Mg = MathExcept(gb, ge);
+		auto f_dist = std::distance(fb, fe);
+		auto g_dist = std::distance(gb, ge);
+		int tau_f = 0;
+		int tau_g = 0;
+		int top;
+		if(tau >= 0) {
+			tau_f = tau;
+			top = std::min(f_dist - 1 - tau_f, g_dist - 1);
+		} else {
+			tau_g = -tau;
+			top = std::min(g_dist - 1 - tau_g, f_dist - 1);
+		}
+		if(top < 0) return 0.0;
+		for(size_t i=0; i <= top; ++i){
+			auto f_el = *(fb + i + tau_f);
+			auto g_el = *(gb  + i + tau_g);
+			if(norm) { f_el -= Mf; g_el -= Mg; }
+			sum += f_el * g_el;
+		}
+		if(norm && top != 0) return sum/top;
+		return sum;
+	}
+
 
 
 
@@ -1114,7 +1146,7 @@ namespace leo{
 
 
 	template<class Iterator1, class Iterator2>
-	std::vector<double> CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, bool norm=false, bool natural=false){
+	std::vector<double> CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, bool norm=true, bool natural=false){
 		auto f_dist = std::distance(fb, fe);
 		auto g_dist = std::distance(gb, ge);
 		std::vector<double> result;
@@ -1218,6 +1250,9 @@ namespace Matrix{
 	std::vector<T> solve(matrix<T> A, std::vector<T> d){
 		return A.inverse()(d);
 	}
+
+
+
 
 namespace BackFFT{
 
@@ -1471,6 +1506,29 @@ namespace BackFFT{
 	auto FFT(std::vector<T> X, bool inverse=false, bool full=0){	return FFT(X.begin(), X.end(), inverse, full);	}
 
 
+
+/*	template<typename T>
+	std::vector<std::complex<T>> DFT(std::vector<std::complex<T>>& x, bool inverse=false){
+			int N = x.size();
+			std::complex<double> X(N, {});
+			for(size_t i = 0; i < N; ++i){
+				for(size_t j = 0; j < N; ++j){
+					X[i] += x[j] * std::exp( std::complex<T>(0, 2 * pi * i * j / N * (inverse ? -1 : 1))  );
+				}
+				if(inverse) X[i] /= N;
+				
+			}
+			return X;
+	}
+*/
+
+	template<typename Iterator>
+	auto DFT(Iterator xb, Iterator xe, bool inverse=false);
+
+
+
+
+
 	template<typename Iterator1, typename Iterator2>
 	auto ConvolveFFT(Iterator1 Ab, Iterator1 Ae, Iterator2 Bb, Iterator2 Be)
 	{
@@ -1549,7 +1607,7 @@ namespace BackFFT{
 
 
 	template<typename Iterator1, typename Iterator2>	
-	auto CCF_FFT(Iterator1 Ab, Iterator1 Ae, Iterator2 Bb, Iterator2 Be){
+	auto CCFbyFFT(Iterator1 Ab, Iterator1 Ae, Iterator2 Bb, Iterator2 Be){
 		using A_elem_type = std::decay_t<decltype(*Ab)>;
 		using A_scalar_type = scalar_type_t<A_elem_type>;
 		using B_elem_type = std::decay_t<decltype(*Bb)>;
@@ -1568,7 +1626,8 @@ namespace BackFFT{
 		std::vector<std::complex<B_scalar_type>> F2(N, 0);
 
 		for(size_t i=0; i < NA; ++i) F1[i] = *(Ab + i);
-		for(size_t i=0; i < NB; ++i) F2[NB - 1 - i] = *(Bb + i);
+		//for(int i=0; i < NB; ++i) F2[N - 1 - i] = *(Bb + i);
+		for( int i=(NB - 1); i >= 0; --i) F2[NB - 1 - i] = *(Bb +i);
 
 		BackFFT::FFT(F1);
 		BackFFT::FFT(F2);
@@ -1737,9 +1796,9 @@ int main(){
 
 	std::cout << K;
 
-	std::vector<double> ccf = leo::CCF(A.AllRow().begin(), A.AllRow().end(), beta.begin(),beta.end(), true);
+	std::vector<double> ccf = leo::CCF(A.AllRow().begin(), A.AllRow().end(), beta.begin(),beta.end(), false);
 
-	std::vector<double> ccf_fft = leo::CCF_FFT(A.AllRow().begin(), A.AllRow().end(), beta.begin(),beta.end());
+	std::vector<double> ccf_fft = leo::CCFbyFFT(A.AllRow().begin(), A.AllRow().end(), beta.begin(),beta.end());
 
 	std::cout << "ccf\tccf_fft\n";
 	for(size_t i=0; i < ccf.size(); ++i) std::cout << ccf[i] << "\t" << ccf_fft[i] << "\n";

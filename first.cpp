@@ -828,198 +828,6 @@ namespace leo{
 }
 
 //===============================================================================Applay_function_modul=========================================================================================
-namespace leo{
-/*
-	template<typename T>
-	struct is_iterator_pair{ static constexpr bool value = false; };
-
-	template<typename Iterator>
-	struct is_iterator_pair<std::pair<Iterator, Iterator>>{
-		static constexpr bool value = true;
-		using value_type = typename std::iterator_traits<Iterator>::value_type;
-	};
-
-	template<typename T>
-	inline constexpr bool is_iterator_pair_v = is_iterator_pair<T>::value;
-
-	template<typename Func, typename... Args>
-	auto applay_to_range(Func&& func, Args&&... args){
-		//using result_type = decltype( func( std::declval< 
-		//				typename std::conditional_t< 
-		//					is_iterator_pair_v<
-		//						std::decay_t<Args>
-		//					>, 
-		//					typename is_iterator_pair<
-		//						std::decay_t<Args>
-		//					>::value_type,
-		//					std::decay_t<Args>
-		//				>...
-		//			> ) );
-	
-		
-
-		template<typename T>
-		using get_value_type_t = typename std::conditional_t<
-							is_iterator_pair_v<
-								std::decay_t<T>
-							>,
-							typename is_iterator_pair<
-								std::decay_t<T>
-							>::value_type,
-							std::decay_t<T>
-					>;
-
-		using result_type = decltype(std::forward<Func>(func)(std::declval<get_value_type_t<Args>>()...));
-
-	
-		std::vector<result_type> result;
-
-		size_t distance = 0;
-		bool distance_initialized = false;
-		
-		auto init_distance = [&](auto& arg) {
-			if constexpr (is_iterator_pair_v< std::decay_t< decltype(arg) > >) {
-				if (!distance_initialized){
-					distance = std::distance(arg.first, arg.second);
-					distance_initialized = true;
-				} else if(distance !=  std::distance(arg.first, arg.second)) throw std:: invalid_argument("applay_to_range - all iterator pairs mast have the same distance");		
-			}
-		};
-
-		(init_distance(args), ...);
-
-		if(!distance_initialized) {
-			distance = 1;
-		}
-
-		result.reserve(distance);
-
-		auto get_value = [](auto&& arg, size_t index) -> decltype(auto){
-			if constexpr (is_iterator_pair_v< std::decay_t< decltype(arg) > >){
-				auto it = arg.first;
-				std::advance(it, index);
-				return *it;
-			} else {
-				return arg;
-			}
-		};
-
-		for(size_t i=0; i < distance; ++i){
-			auto call_func = [&](auto&&... call_args){
-				return func(call_args...);
-			};
-
-			result.push_back(call_func(get_value(args, i)...));
-		}
-
-		return result;
-	}
-
-
-	template<typename T>
-	struct is_function_pointer{ static constexpr bool value = false; };
-
-	template<typename Ret, typename... Args>
-	struct is_function_pointer<Ret(*)(Args...)> {
-		static constexpr bool value = true;
-		using return_type = Ret;
-		using args_tuple = std::tuple<Args...>;
-	};
-
-	template<typename T>
-	inline constexpr bool is_function_pointer_v = is_function_pointer<T>::value;
-
-	template<typename T>
-	struct function_resolver{
-
-		template<typename Ret>
-		static auto resolve(Ret(*func)(T)) -> decltype(auto) { return func; }
-		
-		template<class T, typename Func>
-		static auto resolve(Func&& func) -> decltype(auto){ return std::forward<Func>(func); }
-
-	};
-
-
-
-	template<class T, typename Func>
-	auto applay_to_matrix(matrix<T> A, Func&& func) -> decltype(std::forward<Func>(func)(std::declval<T>()), A)
-	{
-
-		auto matrix_pair = std::make_pair(A.h_begin(), A.h_end());
-		
-		using resul_type = decltype(std::forward<Func>(func)(std::declval<T>()));
-		static_assert(std::is_convertible_v<result_type, T>, "Function must returna type convertible to matrix element type");
-
-		auto res = applay_to_range(std::forward<Func>(func), matrix_pair);
-	
-		auto itv = res.begin();		
-
-		for(auto it=A.h_begin(); it!=A.h_end(); ++it){
-			*it = *itv;
-			++itv;
-		}
-		return A;
-	}
-
-	template<class T, typename Func, typename... Args>
-	matrix<T> applay_to_matrix(matrix<T> A, Func&& func, Args&&... args) -> decltype( std::forwar<Func>(func)( 
-											std::declval<T>(),
-											std::declval<
-												typename std::conditional_t<
-													is_iterator_pair_v<
-														std::decay_t<Args>
-													>,
-													typename is_iterator_pair<
-														std::decay_t<Args>
-													>::value_type,
-													std::decay_t<Args>
-												>...
-											>()
-										), A )
-	{
-
-		auto matrix_pair = std::make_pair(A.h_begin(), A.h_end());
-
-		auto res = applay_to_range(std::forward<Func>(func), matrix_pair, std::forward<Args>(args)...);
-
-		auto itv = res.begin(); 
-
-		for(auto it=A.h_begin(); it!=A.h_end(); ++it){
-			*it = *itv;
-			++itv;
-		}
-		return A;
-	}
-
-	template<class T, typename... FuncArgs>
-	auto applay_to_matrix(matrix<T> A, T(*func)(T)) -> decltype( func(std::declval<T>()), A )
-	{
-		auto wrapper = [func](T x) -> T { return func(x); };
-		return applay_to_matrix(A, wrapper);
-	}
-
-	template<class T, typename Ret, typename... FuncArgs>
-	auto applay_to_matrix(matrix<T> A, T(*func)(FuncArgs...)) -> decltype(func(std::declval<FuncArgs>()...), A)
-	{
-		static_assert(sizeof... (FuncArgs) == 1, "Function must take exectly one argument for matrix operations");
-
-		static_assert(std::is_convertible_v< std::tuple_element_t< 0, std::tuple<FuncArgs...>>, T>, "Function argument must be convertible to matrix element type");
-
-		static_assert(std::is_convertible_v<Ret, T>, "Function return type must be convertible to matrix element type");
-
-		auto wrapper = [func](T x) -> { return static_cast<T>(func(static_cast<FuncArgs>(x)...)); };
-
-		return applay_to_matrix(A, wrapper);
-		
-	}
-
-
-	template<typename T>
-	auto make_math_function(T(*func)(T)) { return [func](T x) -> T { return func(x); }; }
-*/
-}
-
 
 
 //===============================================================================Math_modul=========================================================================================
@@ -1084,31 +892,6 @@ namespace leo{
 	auto Variation(std::vector<T> X){	return Variation(X.begin(), X.end());	}
 
 
-/*	template<class Iterator1, class Iterator2>
-	auto CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, int tau, bool norm=true){
-		if(fb == fe || gb == ge) return 0.0;
-		auto sum = 0.0;
-		auto Mf = MathExcept(fb, fe);
-		auto Mg = MathExcept(gb, ge);
-		auto f_dist = std::distance(fb, fe);
-		auto g_dist = std::distance(gb, ge);
-		int top = std::min(f_dist - 1, g_dist - 1 - tau);
-		int bot = std::max(0, - tau);
-		int dist = top - bot + 1;
-		if(bot > top) return 0.0;
-		for(int i = bot; i <= top; ++i){
-			//std::cout << "My tau = " << tau << ", my t = " << i << ", my f = " << *(fb + i) << " my g = " << *(gb  + i + tau) << "\n";
-			auto f_el = *(fb + i);
-			auto g_el = *(gb  + i + tau);
-			if(norm) { f_el -= Mf; g_el -= Mg; }
-			sum += f_el * g_el;
-		}
-		if(norm && dist != 0) return sum/dist;
-		return sum;
-	}
-*/
-
-
 	template<class Iterator1, class Iterator2>
 	auto CCF(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, int tau, bool norm=true){
 		if(fb == fe || gb == ge) return 0.0;
@@ -1142,7 +925,7 @@ namespace leo{
 
 
 	template<typename T1, typename T2>
-	auto CCF(std::vector<T1> f, std::vector<T2> g, int tau,  bool norm=false){	return  CCF(f.begin(), f.end(), g.begin(), g.end(), tau, norm);	}
+	auto CCF(std::vector<T1> f, std::vector<T2> g, int tau,  bool norm=true){	return  CCF(f.begin(), f.end(), g.begin(), g.end(), tau, norm);	}
 
 
 	template<class Iterator1, class Iterator2>
@@ -1168,18 +951,18 @@ namespace leo{
 
 	
 	template<class Iterator>
-	auto ACF(Iterator fb, Iterator fe, int tau){
-		return CCF(fb, fe, fb, fe, tau);
+	auto ACF(Iterator fb, Iterator fe, int tau,  bool norm=true){
+		return CCF(fb, fe, fb, fe, tau, norm);
 	}
 
 
 	template<typename T1>
-	auto ACF(std::vector<T1> f, int tau) {	return CCF(f.begin(), f.end(), f.begin(), f.end(), tau);	}
+	auto ACF(std::vector<T1> f, int tau,  bool norm=true) {	return CCF(f.begin(), f.end(), f.begin(), f.end(), tau, norm);	}
 
 
 
 	template<class Iterator>
-	auto /*std::vector<double>*/ ACF(Iterator fb, Iterator fe) -> std::vector<typename std::iterator_traits<Iterator>::value_type>
+	auto ACF(Iterator fb, Iterator fe,  bool norm=true) -> std::vector<typename std::iterator_traits<Iterator>::value_type>
 	{
 		using T = typename std::iterator_traits<Iterator>::value_type;
 
@@ -1187,21 +970,20 @@ namespace leo{
 		std::vector<T> result;
 		result.reserve(f_dist);
 		for(size_t lag=0; lag < f_dist; ++lag){
-			result.emplace_back(ACF(fb, fe, lag));
+			result.emplace_back(ACF(fb, fe, lag, norm));
 		}
 		return result;
 	}
 
 
 	template<typename T1>
-	auto ACF(std::vector<T1> f) {	return ACF(f.begin(), f.end());	}
+	auto ACF(std::vector<T1> f,  bool norm=true) {	return ACF(f.begin(), f.end(), norm);	}
 
 
 
 namespace Matrix{
 	template<class Iterator>
-	auto ACF(Iterator fb, Iterator fe) -> matrix<typename std::iterator_traits<Iterator>::value_type> 
-						//decltype(matrix<typename std::iterator_traits<Iterator>::value_type>())
+	auto ACF(Iterator fb, Iterator fe,  bool norm=true) -> matrix<typename std::iterator_traits<Iterator>::value_type> 
 	{
 		using T = typename std::iterator_traits<Iterator>::value_type;
 		auto f_dist = std::distance(fb, fe);
@@ -1209,7 +991,7 @@ namespace Matrix{
 		for(int i=0; i!=f_dist; ++i){
 			for(int j=0; j!=f_dist; ++j){
 				int lag = std::abs(j - i);
-				A[i][j] = leo::ACF(fb, fe, lag);
+				A[i][j] = leo::ACF(fb, fe, lag, norm);
 			}
 		}
 	
@@ -1217,7 +999,7 @@ namespace Matrix{
 	}
 
 	template<typename T1>
-	auto ACF(std::vector<T1> f) {   return Matrix::ACF(f.begin(), f.end());	}
+	auto ACF(std::vector<T1> f,  bool norm=true) {   return Matrix::ACF(f.begin(), f.end(), norm);	}
 
 	template<class T>
 	matrix<T> Cov(matrix<T> A){
@@ -1626,8 +1408,7 @@ namespace BackFFT{
 		std::vector<std::complex<B_scalar_type>> F2(N, 0);
 
 		for(size_t i=0; i < NA; ++i) F1[i] = *(Ab + i);
-		//for(int i=0; i < NB; ++i) F2[N - 1 - i] = *(Bb + i);
-		for( int i=(NB - 1); i >= 0; --i) F2[NB - 1 - i] = *(Bb +i);
+		for( int i=(NB - 1); i >= 0; --i) F2[NB - 1 - i] = *(Bb + i);
 
 		BackFFT::FFT(F1);
 		BackFFT::FFT(F2);
@@ -1656,9 +1437,9 @@ namespace leo{
 	
 
 	template<typename Iterator1, typename Iterator2>
-	auto Filter_Kolmogorow_Winer(Iterator1 Sb, Iterator1 Se, Iterator2 ESb, Iterator2 ESe, bool filtiring=false){
-		auto ccf = CCF(Sb, Se, ESb, ESe);
-		auto M = Matrix::ACF(Sb, Se).inverse();
+	auto Filter_Kolmogorow_Winer(Iterator1 Sb, Iterator1 Se, Iterator2 ESb, Iterator2 ESe, bool norm=false, bool filtiring=false){
+		auto ccf = CCF(Sb, Se, ESb, ESe, norm, true);
+		auto M = Matrix::ACF(Sb, Se, norm).inverse();
 		ccf.resize(M.size_col());
 		auto h_filter = M( ccf );
 		if (filtiring) return ConvolveFFT(Sb, Se, h_filter.begin(), h_filter.end());
@@ -1670,16 +1451,16 @@ namespace leo{
 
 
 	template<typename T1, typename T2>
-	auto Filter_Kolmogorow_Winer(std::vector<T1> signal, std::vector<T2> excepted_signal, bool filtiring=false){
-		return Filter_Kolmogorow_Winer(signal.begin(), signal.end(), excepted_signal.begin(), excepted_signal.end(), filtiring); 
+	auto Filter_Kolmogorow_Winer(std::vector<T1> signal, std::vector<T2> excepted_signal, bool norm=false, bool filtiring=false){
+		return Filter_Kolmogorow_Winer(signal.begin(), signal.end(), excepted_signal.begin(), excepted_signal.end(), norm, filtiring); 
 	}
 
 	template<typename Iterator1, typename Iterator2>
-	auto Filter_Consistent(Iterator1 Noise_b, Iterator1 Noise_e, Iterator2 ESb, Iterator2 ESe){
+	auto Filter_Consistent(Iterator1 Noise_b, Iterator1 Noise_e, Iterator2 ESb, Iterator2 ESe, bool norm=false){
 		using signal_type = std::decay_t<decltype(*Noise_b)>;
 
-		auto ccf = CCF(Noise_b, Noise_e, ESb, ESe);
-		auto M = Matrix::ACF(Noise_b, Noise_e).inverse();
+		auto ccf = CCF(Noise_b, Noise_e, ESb, ESe, norm, true);
+		auto M = Matrix::ACF(Noise_b, Noise_e, norm).inverse();
 		M.resize(M.size_col(), ccf.size);
 		auto h_filter = M( ccf );
 		matrix<signal_type> S(1, h_filter.size());
@@ -1690,19 +1471,19 @@ namespace leo{
 	}
 
 	template<typename Iterator1, typename Iterator2, typename Iterator3>
-	auto Filter_Consistent(Iterator1 Noise_b, Iterator1 Noise_e, Iterator2 ESb, Iterator2 ESe, Iterator3 Sb, Iterator3 Se){
-		auto h_filter = Filter_Consistent(Noise_b, Noise_e, ESb, ESe);
+	auto Filter_Consistent(Iterator1 Noise_b, Iterator1 Noise_e, Iterator2 ESb, Iterator2 ESe, Iterator3 Sb, Iterator3 Se, bool norm=false){
+		auto h_filter = Filter_Consistent(Noise_b, Noise_e, ESb, ESe, norm);
 		return ConvolveFFT(Sb, Se, h_filter.begin(), h_filter.end());
 	}
 
 	template<typename T1, typename T2>
-        auto Filter_Consistent(std::vector<T1> noise, std::vector<T2> excepted_signal){
-		return Filter_Consistent(noise.begin(), noise.end(), excepted_signal.begin(), excepted_signal.end());
+        auto Filter_Consistent(std::vector<T1> noise, std::vector<T2> excepted_signal, bool norm=false){
+		return Filter_Consistent(noise.begin(), noise.end(), excepted_signal.begin(), excepted_signal.end(), norm);
 	}
 
 	template<typename T1, typename T2, typename T3>
-	auto Filter_Consistent(std::vector<T1> noise, std::vector<T2> excepted_signal, std::vector<T3> signal){
-		return Filter_Consistent(signal.begin(), signal.end(), excepted_signal.begin(), excepted_signal.end(), signal.begin(), signal.end());
+	auto Filter_Consistent(std::vector<T1> noise, std::vector<T2> excepted_signal, std::vector<T3> signal, bool norm=false){
+		return Filter_Consistent(signal.begin(), signal.end(), excepted_signal.begin(), excepted_signal.end(), signal.begin(), signal.end(), norm);
 	}
 
 	/*template<typename Iterator1, typename Iterator2>
@@ -1713,6 +1494,169 @@ namespace leo{
 	}*/
 
 
+}
+
+
+//===============================================================================Solve_linal_modul========================================================================================= 
+
+template<typename Iterator>
+auto Norm_FuncSpace_C(Iterator fb, Iterator fe) -> std::decay_t<decltype(*fb)>
+{
+	if( fb == fe) return 0.0;
+	else return std::max(fb, fe);
+}
+
+template<typename Iterator1, typename Iterator2>
+auto Norm_FuncSpace_C(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
+{
+	if( fb == fe || gb == ge ) return 0.0;
+	
+	auto f_dist = std::distance(fb, fe);
+	auto g_dist = std::distance(gb, ge);
+
+	size_t dist = std::min(f_dist, g_dist);
+
+	auto rVal = std::abs( *fb - *gb );
+
+	for(size_t i = 1; i < dist; ++i){
+		auto nVal = std::abs( *(fb + i) - *(gb + i));
+		if( rVal < nVal ) rVal = nVal;
+	}
+
+	return rVal;
+}
+
+
+
+template<typename Iterator>
+auto Norm_FuncSpace_L1(Iterator fb, Iterator fe)
+{
+	if( fb == fe) return 0.0;
+
+	auto f_dist = std::distance(fb, fe);
+
+	auto rVal = std::abs(*fb);
+
+	for(size_t i = 1; i < f_dist; ++i){
+		rVal += std::abs(*(fb + i));
+	}
+
+	return rVal;
+}
+
+
+
+template<typename Iterator1, typename Iterator2>
+auto Norm_FuncSpace_L1(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
+{
+	if( fb == fe || gb == ge ) return 0.0;
+
+	auto f_dist = std::distance(fb, fe);
+	auto g_dist = std::distance(gb, ge);
+
+	size_t dist = std::min(f_dist, g_dist);
+
+	auto rVal = std::abs( *fb - *gb );
+
+	for(size_t i = 1; i < dist; ++i){
+		rVal += std::abs(*(fb + i) - *(gb + i));
+	}
+
+	return rVal;
+}
+
+
+template<typename Iterator>
+auto Norm_FuncSpace_L2(Iterator fb, Iterator fe)
+{
+	if( fb == fe) return 0.0;
+
+	auto f_dist = std::distance(fb, fe);
+
+	auto rVal = *fb * *fb;
+
+	for(size_t i = 1; i < f_dist; ++i){
+		rVal += *(fb + i) * *(fb + i);
+	}
+
+	rVal = std::sqrt(rVal);
+
+	return rVal;
+}
+
+
+template<typename Iterator1, typename Iterator2>
+auto Norm_FuncSpace_L2(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
+{
+	if( fb == fe || gb == ge ) return 0.0;
+
+	auto f_dist = std::distance(fb, fe);
+	auto g_dist = std::distance(gb, ge);
+
+	size_t dist = std::min(f_dist, g_dist);
+
+	auto rVal = (*fb - *gb) * (*fb - *gb);
+
+	for(size_t i = 1; i < dist; ++i){
+		rVal += (*(fb + i) - *(gb + i)) * (*(fb + i) - *(gb + i));
+	}
+
+	rVal = std::sqrt(rVal);
+
+	return rVal;
+}
+
+
+template<typename Iterator>
+auto Norm_FuncSpace_W(Iterator fb, Iterator fe, double g=1.0, double w_d=1.0)
+{
+	if( fb == fe) return 0.0;
+
+	auto f_dist = std::distance(fb, fe);
+
+	auto f_d = (*(fb + 2)  - *fb)/(3 * w_d);
+
+	auto rVal = *(fb + 1) * *(fb + 1) + g * g * f_d * f_d;
+
+	for(size_t i = 2; i < (f_dist - 1); ++i){
+		f_d = (*(fb + i + 1)  - *(fb + i - 1))/(3 * w_d);
+		rVal += *(fb + i) * *(fb + i) + g * g * f_d * f_d;
+	}
+
+	rVal = std::sqrt(rVal);
+
+	return rVal;
+}
+
+
+template<typename Iterator1, typename Iterator2>
+auto Norm_FuncSpace_W(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, double g=1.0, double wf_d=1.0, double wg_d=1.0)
+{
+	if( fb == fe || gb == ge ) return 0.0;
+
+	auto f_dist = std::distance(fb, fe);
+	auto g_dist = std::distance(gb, ge);
+
+	size_t dist = std::min(f_dist, g_dist);
+
+	auto f_d = (*(fb + 2) - *fb)/(3 * wf_d);
+	auto g_d = (*(gb + 2) - *gb)/(3 * wg_d);
+
+	auto fg_d = *(fb + 1) - *(gb + 1);
+
+	auto rVal = fg_d * fg_d + g * g * (f_d - g_d) * (f_d - g_d);
+
+	for(size_t i = 2; i < (dist - 1); ++i){
+		f_d = (*(fb + i + 1) - *(fb + i - 1))/(3 * wf_d);
+		g_d = (*(gb + i + 1) - *(gb + i - 1))/(3 * wg_d);
+		fg_d = *(fb + i) - *(gb + i);
+
+		rVal += fg_d * fg_d + g * g * (f_d - g_d) * (f_d - g_d);
+	}
+
+	rVal = std::sqrt(rVal);
+
+	return rVal;
 }
 
 
@@ -1785,7 +1729,7 @@ int main(){
 	for(auto it : beta) std::cout << it << " ";
 	std::cout << "\n" << "size beta: " << beta.size() << "\n";
 
-	std::vector<double> FKW = Filter_Kolmogorow_Winer(A.AllRow().begin(), A.AllRow().end(), beta.begin(),beta.end(), true);
+	std::vector<double> FKW = Filter_Kolmogorow_Winer(A.AllRow().begin(), A.AllRow().end(), beta.begin(),beta.end(), false, true);
 
 	std::cout << "\n";
 	for(auto it : FKW) std::cout << it << " ";

@@ -17,6 +17,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <thread>
 
 
 //===============================================================================Matrix_modul=========================================================================================
@@ -49,7 +50,11 @@ namespace leo{
 	template<class T, class Scalar> 
 	auto operator*(T b, const matrix<T>& a) -> matrix< decltype(std::declval<Scalar>() * std::declval<T>()) >;
 
-	template<class T>  std::ostream& operator<<(std::ostream& os, const matrix<T>& m);
+	template<class T>  
+	std::ostream& operator<<(std::ostream& os, const matrix<T>& m);
+
+	template<class T> 
+	matrix<T>& operator>>(std::istream& is, matrix<T>& m);
 
 	
 	enum class SM{
@@ -73,19 +78,20 @@ namespace leo{
 	private:
 			std::vector<std::vector<T>> MATRIX;
 			size_t col, row, mat;
-			std::vector<std::vector<std::string>> LABELS;
+			//std::vector<std::vector<std::string>> LABELS;
 	public:
 		friend std::ostream& operator<< <>(std::ostream& os, const matrix<T>& m);
+		friend matrix<T>& operator>> <>(std::istream& is, matrix<T>& m);
 
 			matrix(size_t r, size_t c) : row(r), col(c) {
 				MATRIX.resize(row, std::vector<T>(col, 0));
 				mat = row * col;
-				LABELS.resize(2);
-				LABELS[0].reserve(row);
-				LABELS[1].reserve(col);
+				//LABELS.resize(2);
+				//LABELS[0].reserve(row);
+				//LABELS[1].reserve(col);
 			}
 			
-			matrix(const matrix<T>& A) : row(A.row), col(A.col), mat(A.mat), MATRIX(A.MATRIX), LABELS(A.LABELS) {}
+			matrix(const matrix<T>& A) : row(A.row), col(A.col), mat(A.mat), MATRIX(A.MATRIX)/*, LABELS(A.LABELS)*/ {}
 
 
 			matrix<T> operator=(const matrix<T>& A){
@@ -94,13 +100,13 @@ namespace leo{
 					col = A.col;
 					mat = A.mat;
 					MATRIX = A.MATRIX;
-					LABELS = A.LABELS;
+					//LABELS = A.LABELS;
 				}
 				return *this;
 			}
 
 
-			matrix(matrix<T>&& A) noexcept : row(A.row), col(A.col), mat(A.mat), MATRIX(std::move(A.MATRIX)), LABELS(std::move(A.LABELS)){ A.row = A.col = A.mat = 0; }
+			matrix(matrix<T>&& A) noexcept : row(A.row), col(A.col), mat(A.mat), MATRIX(std::move(A.MATRIX))/*, LABELS(std::move(A.LABELS))*/{ A.row = A.col = A.mat = 0; }
 
 			matrix<T>& operator=(matrix<T>&& A) noexcept {
 				if (this != &A){
@@ -108,7 +114,7 @@ namespace leo{
 					col = A.col;
 					mat = A.mat;
 					MATRIX = std::move(A.MATRIX);
-					LABELS = std::move(A.LABELS);
+					//LABELS = std::move(A.LABELS);
 
 					A.row = A.col = A.mat = 0;
 				}
@@ -125,13 +131,13 @@ namespace leo{
 				return MATRIX[r];
                         }
 
-			std::string& row_label(size_t i){
+			/*std::string& row_label(size_t i){
 				return &LABELS[0][i];
 			}
 
 			std::string& col_label(size_t i){
 				return &LABELS[1][i];
-			}
+			}*/
 
 			size_t size(SM n) const {
 				switch(n){
@@ -646,21 +652,82 @@ namespace leo{
 
 	template<class T>
 	std::ostream& operator<<(std::ostream& os, const matrix<T>& m){
-		if(!m.LABELS[0].empty()) os << "\t";
+		/*if(!m.LABELS[0].empty()) os << "\t";
 		if(!m.LABELS[1].empty()){
 			for(auto name : m.LABELS[1]){
 				os << name << "\t";
 			}
-		}
+		}*/
 		os << "\n";
 		for(size_t i=0; i < m.size_row(); ++i){
-			if(!m.LABELS[0].empty()) os << m.LABELS[0][i] << "\t";
+			//if(!m.LABELS[0].empty()) os << m.LABELS[0][i] << "\t";
 			for(size_t j=0; j < m.size_col(); ++j){
 				os << m.MATRIX[i][j] << "\t";
 			}
 			os << "\n";
 		}
 		return os;
+	}
+
+	template<class T> 
+        matrix<T>& operator>>(std::istream& is, matrix<T>& m){
+		std::string line;
+		std::vector<std::string> date;
+
+		while(std::getline(is, line)){
+			date.push_back(line);
+		}
+
+		auto split = [&] (const std::string& str, const std::string& delimiter) {
+			std::vector<std::string> tokens;
+			size_t start = 0;
+			size_t end;
+
+			while ( (end = str.find(delimiter, start)) != std::string::npos){
+				std::string token = str.substr(start, end - start);
+				if(!token.empty()) tokens.push_back(token);
+				start = end + delimiter.length();
+			}
+
+			std::string last = str.substr(start);
+			if(!last.empty()) tokens.push_back(last);
+
+			return tokens;
+		};
+
+		auto string_to = [&] (const std::string& str) {
+			std::istringstream iss(str);
+			T value;
+			if(!(iss >> value)) throw std::invalid_argument("Read matrix: Cannot convert to type T");
+			return value;
+		};
+
+		std::vector<std::string> first_line = split(date[0], "\t");
+		
+		size_t cols = first_line.size();
+		size_t rows = date.size();
+		m.resize(rows, cols);
+
+		auto st_to_matrix = [&m, cols] (std::vector<std::string> st, size_t r) {
+			if(st.size() != cols) throw std::out_of_range("Read matrix: String has got uncorrect number of column!\n");
+
+			for(size_t col_idx=0; col_idx < cols; ++col_idx){
+				try {
+					T value = string_to(st[col_idx]);
+					m.MATRIX[r][col_idx] = value;
+				} catch (const std::exception& e) {
+					std::cerr << "Mistake in row " << r + 1 << " column " << col_idx + 1 << " : '" << st[col_idx] << "' ---> " << e.what() << "\n";
+				}
+			}
+		};
+
+		st_to_matrix(first_line, 0);
+
+		for(size_t row_idx=1; row_idx < rows; ++row_idx){
+			std::vector<std::string> next_line = split(date[row_idx], "\t");
+			if(next_line.size() >= cols) st_to_matrix(next_line, row_idx);
+		}
+		return m;
 	}
 
 	//===========================Iterators_to_Matrix========================================
@@ -1030,7 +1097,13 @@ namespace Matrix{
 	
 	template<class T>
 	std::vector<T> solve(matrix<T> A, std::vector<T> d){
-		return A.inverse()(d);
+		if(A.size_row() < A.size_col()) {
+			matrix<T> A_t = A.transposition();
+			return A_t( (A(A_t)).inverse()(d) );
+		} else if(A.size_row() > A.size_col()){ 
+			matrix<T> A_t = A.transposition();
+			return ( A_t(A) ).inverse()( A_t(d) );
+		} else return A.inverse()(d);
 	}
 
 
@@ -1501,10 +1574,10 @@ namespace leo{
 
 namespace leo{
 
-struct Norm_FS_C_tag {}
-struct Norm_FS_L1_tag {}
-struct Norm_FS_L2_tag {}
-struct Norm_FS_W_tag {}
+struct Norm_FS_C_tag {};
+struct Norm_FS_L1_tag {};
+struct Norm_FS_L2_tag {};
+struct Norm_FS_W_tag {};
 
 inline constexpr Norm_FS_C_tag nfs_C {};
 inline constexpr Norm_FS_L1_tag nfs_L1 {};
@@ -1653,7 +1726,7 @@ auto Norm_FuncSpace(Norm_FS_L2_tag, Iterator fb, Iterator fe)
 template<typename Iterator1, typename Iterator2>
 auto Norm_FuncSpace(Norm_FS_L2_tag, Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
 {
-	rturn Norm_FuncSpace_L2(fb, fe, gb, ge);
+	return Norm_FuncSpace_L2(fb, fe, gb, ge);
 }
 
 
@@ -1722,13 +1795,13 @@ auto Norm_FuncSpace_W(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, do
 template<typename Iterator>
 auto Norm_FuncSpace(Norm_FS_W_tag, Iterator fb, Iterator fe, double g=1.0, double w_d=1.0)
 {
-	return Norm_FuncSpace_W(fd, fe, g, w_d);
+	return Norm_FuncSpace_W(fb, fe, g, w_d);
 }
 
 template<typename Iterator1, typename Iterator2>
 auto Norm_FuncSpace(Norm_FS_W_tag, Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, double g=1.0, double wf_d=1.0, double wg_d=1.0)
 {
-	return Norm_FuncSpace_W(fd, fe, gb, ge, g, wf_d, wg_d);
+	return Norm_FuncSpace_W(fb, fe, gb, ge, g, wf_d, wg_d);
 }
 
 
@@ -1823,31 +1896,31 @@ auto Hessian(Iterator1 Func_begin, Iterator1 Func_end, matrix<T> M)
 }
 
 
-template<typename Iterator1, typename Iterator2)
+template<typename Iterator1, typename Iterator2>
 auto Hessian(Iterator1 Func_begin, Iterator1 Func_end, Iterator2 value1_begin, Iterator2 value2_end)
 {
 	auto H = Frechet_derivative(Func_begin, Func_end, value1_begin, value2_end);
-	return H_2 = Frechet_derivative(H.begin(), H.end(), value1_begin, value2_end);
+	return Frechet_derivative(H.begin(), H.end(), value1_begin, value2_end);
 }
 
 
 template<size_t Index1, size_t Index2, typename Tag, typename T, typename Iterator1, typename Iterator2, typename Func, typename... Args>
-auto Method_Newton(Tag tag, T error=1.0, size_t max_iter=100, Iterator1 data_b, Iterator1 data_e, Func& func, Args&&... args)
+auto Method_Newton(Tag tag, T error/*=1.0*/, size_t max_iter/*=100*/, Iterator1 data_b, Iterator1 data_e, Func& func, Args&&... args)
 {
 	static_assert(Index1 < sizeof...(Args), "First Index out of range!");
 	static_assert(Index2 < sizeof...(Args), "Second Index out of range!");
 
 	auto tuple = std::forward_as_tuple(args...);
 
-	Iterator2 f_b = std::get<Index1>(typle);
-	Iterator2 f_e = std::get<Index2>(typle);
+	Iterator2 f_b = std::get<Index1>(tuple);
+	Iterator2 f_e = std::get<Index2>(tuple);
 
-	auto dist_data = std::distanse(data_b, dtat_e);
+	auto dist_data = std::distance(data_b, data_e);
 	auto dist_f = std::distance(f_b, f_e);
 
-	auto res = std::apply(func, typle);
+	auto res = std::apply(func, tuple);
 
-	if(res.size() != dist_data) throw std::invalid_argument("Method_Newton: Lenght of results function and parametrs vector not equel!")
+	if(res.size() != dist_data) throw std::invalid_argument("Method_Newton: Lenght of results function and parametrs vector not equel!");
 
 	using par_type = std::decay_t<decltype(*f_b)>;
 	using data_type = std::decay_t<decltype(*data_b)>;
@@ -1859,8 +1932,8 @@ auto Method_Newton(Tag tag, T error=1.0, size_t max_iter=100, Iterator1 data_b, 
 	std::vector<par_type> result;
 	result.insert(result.begin(), f_b, f_e);
 
-	std::get<Index1>(typle) = result.begin();
-	std::get<Index2>(typle) = result.end();
+	std::get<Index1>(tuple) = result.begin();
+	std::get<Index2>(tuple) = result.end();
 
 	size_t iteration = 0;
 
@@ -1902,12 +1975,12 @@ auto Method_Newton(Tag tag, T error=1.0, size_t max_iter=100, Iterator1 data_b, 
 		std::vector<dres_type> gn = Hessian(H.begin(), H.end(), data_b, data_e);
 
 		matrix<dres_type> H_ln(1, res.size());
-		for(size_t i=0, i < H_ln.size_col(); ++i) H_ln[0][i] = H[i];
+		for(size_t i=0; i < H_ln.size_col(); ++i) H_ln[0][i] = H[i];
 
 		dres_type gn_norm = Norm_FuncSpace(tag, gn_norm.begin(), gn_norm.end());
 		gn_norm *= gn_norm;
 
-		dres_type k_grad = H_ln(ln) / g_norm;
+		dres_type k_grad = H_ln(ln) / gn_norm;
 
 		std::transform(
 			result.begin(), result.end(),
@@ -1916,7 +1989,7 @@ auto Method_Newton(Tag tag, T error=1.0, size_t max_iter=100, Iterator1 data_b, 
 			[](par_type m, dres_type b) { return m - k_grad * b; }
 		);
 
-		res = std::apply(func, typle);
+		res = std::apply(func, tuple);
 
 		derror = Norm_FuncSpace(tag, res.begin(), res.end(), data_b, data_e) / Norm_FuncSpace( data_b, data_e);
 
@@ -2017,6 +2090,32 @@ int main(){
 	for(size_t i=0; i < ccf.size(); ++i) std::cout << ccf[i] << "\t" << ccf_fft[i] << "\n";
 	std::cout << "size ccf = " << ccf.size() << "\tsize ccf_fft = " << ccf_fft.size() << "\n";
 
+/*
+	std::vector<int> mas(10, 0);
+
+	std::cout << std::endl;
+	for(auto el : mas) std::cout << el << "\t";
+	std::cout << std::endl;
+
+	std::vector<std::thread> Tr;
+	for(size_t i = 0; i < mas.size(); ++i){
+		Tr.push_back(std::thread( [&mas, i] {
+			mas[i] = 1 + i;
+		}));
+	}
+
+	for(auto& t : Tr){
+		t.join();
+	}
+
+	for(size_t i = 0; i < mas.size(); ++i){
+		mas[i] = 1 + i;
+	}
+
+	std::cout << std::endl;
+	for(auto el : mas) std::cout << el << "\t";
+	std::cout << std::endl;
+*/
 	return 0;
 }
 

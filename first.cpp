@@ -1499,17 +1499,30 @@ namespace leo{
 
 //===============================================================================Solve_linal_modul========================================================================================= 
 
+namespace leo{
+
+struct Norm_FS_C_tag {}
+struct Norm_FS_L1_tag {}
+struct Norm_FS_L2_tag {}
+struct Norm_FS_W_tag {}
+
+inline constexpr Norm_FS_C_tag nfs_C {};
+inline constexpr Norm_FS_L1_tag nfs_L1 {};
+inline constexpr Norm_FS_L2_tag nfs_L2 {};
+inline constexpr Norm_FS_W_tag nfs_W {};
+
+
 template<typename Iterator>
 auto Norm_FuncSpace_C(Iterator fb, Iterator fe) -> std::decay_t<decltype(*fb)>
 {
-	if( fb == fe) return 0.0;
+	if( fb == fe) throw std::invalid_argument("Norm_FuncSpace_W: Lenght of massive less them 1");
 	else return std::max(fb, fe);
 }
 
 template<typename Iterator1, typename Iterator2>
 auto Norm_FuncSpace_C(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
 {
-	if( fb == fe || gb == ge ) return 0.0;
+	if( fb == fe || gb == ge ) throw std::invalid_argument("Norm_FuncSpace_W: Lenght of massive less them 1");
 	
 	auto f_dist = std::distance(fb, fe);
 	auto g_dist = std::distance(gb, ge);
@@ -1527,11 +1540,23 @@ auto Norm_FuncSpace_C(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
 }
 
 
+template<typename Iterator>
+auto Norm_FuncSpace(Norm_FS_C_tag, Iterator fb, Iterator fe)
+{
+	return Norm_FuncSpace_C(fb, fe);
+}
+
+template<typename Iterator1, typename Iterator2>
+auto Norm_FuncSpace(Norm_FS_C_tag, Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
+{
+	return Norm_FuncSpace_C(fb, fe, gb, ge);
+}
+
 
 template<typename Iterator>
 auto Norm_FuncSpace_L1(Iterator fb, Iterator fe)
 {
-	if( fb == fe) return 0.0;
+	if( fb == fe) throw std::invalid_argument("Norm_FuncSpace_W: Lenght of massive less them 1");
 
 	auto f_dist = std::distance(fb, fe);
 
@@ -1549,7 +1574,7 @@ auto Norm_FuncSpace_L1(Iterator fb, Iterator fe)
 template<typename Iterator1, typename Iterator2>
 auto Norm_FuncSpace_L1(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
 {
-	if( fb == fe || gb == ge ) return 0.0;
+	if( fb == fe || gb == ge ) throw std::invalid_argument("Norm_FuncSpace_W: Lenght of massive less them 1");
 
 	auto f_dist = std::distance(fb, fe);
 	auto g_dist = std::distance(gb, ge);
@@ -1565,11 +1590,23 @@ auto Norm_FuncSpace_L1(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
 	return rVal;
 }
 
+template<typename Iterator>
+auto Norm_FuncSpace(Norm_FS_L1_tag, Iterator fb, Iterator fe)
+{
+	return Norm_FuncSpace_L1(fb, fe);
+}
+
+template<typename Iterator1, typename Iterator2>
+auto Norm_FuncSpace(Norm_FS_L1_tag, Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
+{
+	return Norm_FuncSpace_L1(fb, fe, gb, ge);
+}
+
 
 template<typename Iterator>
 auto Norm_FuncSpace_L2(Iterator fb, Iterator fe)
 {
-	if( fb == fe) return 0.0;
+	if( fb == fe) throw std::invalid_argument("Norm_FuncSpace_W: Lenght of massive less them 1");
 
 	auto f_dist = std::distance(fb, fe);
 
@@ -1588,7 +1625,7 @@ auto Norm_FuncSpace_L2(Iterator fb, Iterator fe)
 template<typename Iterator1, typename Iterator2>
 auto Norm_FuncSpace_L2(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
 {
-	if( fb == fe || gb == ge ) return 0.0;
+	if( fb == fe || gb == ge ) throw std::invalid_argument("Norm_FuncSpace_W: Lenght of massive less them 1");
 
 	auto f_dist = std::distance(fb, fe);
 	auto g_dist = std::distance(gb, ge);
@@ -1606,20 +1643,38 @@ auto Norm_FuncSpace_L2(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
 	return rVal;
 }
 
+template<typename Iterator>
+auto Norm_FuncSpace(Norm_FS_L2_tag, Iterator fb, Iterator fe)
+{
+	return Norm_FuncSpace_L2(fb, fe);
+}
+
+
+template<typename Iterator1, typename Iterator2>
+auto Norm_FuncSpace(Norm_FS_L2_tag, Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge)
+{
+	rturn Norm_FuncSpace_L2(fb, fe, gb, ge);
+}
+
+
 
 template<typename Iterator>
 auto Norm_FuncSpace_W(Iterator fb, Iterator fe, double g=1.0, double w_d=1.0)
 {
-	if( fb == fe) return 0.0;
+	if( fb == fe) throw std::invalid_argument("Norm_FuncSpace_W: Lenght of massive less them 1");
 
 	auto f_dist = std::distance(fb, fe);
 
-	auto f_d = (*(fb + 2)  - *fb)/(3 * w_d);
+	if(f_dist < 3) throw std::invalid_argument("Norm_FuncSpace_W: Lenght of massiver less them 3");
+
+	auto f_d = (*(fb + 2)  - *fb)/(2 * w_d);
 
 	auto rVal = *(fb + 1) * *(fb + 1) + g * g * f_d * f_d;
 
+	if(f_dist == 3) return std::sqrt(rVal);
+
 	for(size_t i = 2; i < (f_dist - 1); ++i){
-		f_d = (*(fb + i + 1)  - *(fb + i - 1))/(3 * w_d);
+		f_d = (*(fb + i + 1)  - *(fb + i - 1))/(2 * w_d);
 		rVal += *(fb + i) * *(fb + i) + g * g * f_d * f_d;
 	}
 
@@ -1632,23 +1687,27 @@ auto Norm_FuncSpace_W(Iterator fb, Iterator fe, double g=1.0, double w_d=1.0)
 template<typename Iterator1, typename Iterator2>
 auto Norm_FuncSpace_W(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, double g=1.0, double wf_d=1.0, double wg_d=1.0)
 {
-	if( fb == fe || gb == ge ) return 0.0;
+	if( fb == fe || gb == ge ) throw std::invalid_argument("Norm_FuncSpace_W: Lenght of massive less them 1");
 
 	auto f_dist = std::distance(fb, fe);
 	auto g_dist = std::distance(gb, ge);
 
 	size_t dist = std::min(f_dist, g_dist);
 
-	auto f_d = (*(fb + 2) - *fb)/(3 * wf_d);
-	auto g_d = (*(gb + 2) - *gb)/(3 * wg_d);
+	if(dist < 3) throw std::invalid_argument("Norm_FuncSpace_W: Lenght of massive less them 3");
+
+	auto f_d = (*(fb + 2) - *fb)/(2 * wf_d);
+	auto g_d = (*(gb + 2) - *gb)/(2 * wg_d);
 
 	auto fg_d = *(fb + 1) - *(gb + 1);
 
 	auto rVal = fg_d * fg_d + g * g * (f_d - g_d) * (f_d - g_d);
 
+	if(dist == 3) return std::sqrt(rVal);
+
 	for(size_t i = 2; i < (dist - 1); ++i){
-		f_d = (*(fb + i + 1) - *(fb + i - 1))/(3 * wf_d);
-		g_d = (*(gb + i + 1) - *(gb + i - 1))/(3 * wg_d);
+		f_d = (*(fb + i + 1) - *(fb + i - 1))/(2 * wf_d);
+		g_d = (*(gb + i + 1) - *(gb + i - 1))/(2 * wg_d);
 		fg_d = *(fb + i) - *(gb + i);
 
 		rVal += fg_d * fg_d + g * g * (f_d - g_d) * (f_d - g_d);
@@ -1659,6 +1718,216 @@ auto Norm_FuncSpace_W(Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, do
 	return rVal;
 }
 
+
+template<typename Iterator>
+auto Norm_FuncSpace(Norm_FS_W_tag, Iterator fb, Iterator fe, double g=1.0, double w_d=1.0)
+{
+	return Norm_FuncSpace_W(fd, fe, g, w_d);
+}
+
+template<typename Iterator1, typename Iterator2>
+auto Norm_FuncSpace(Norm_FS_W_tag, Iterator1 fb, Iterator1 fe, Iterator2 gb, Iterator2 ge, double g=1.0, double wf_d=1.0, double wg_d=1.0)
+{
+	return Norm_FuncSpace_W(fd, fe, gb, ge, g, wf_d, wg_d);
+}
+
+
+template<typename Iterator1, typename Iterator2>
+auto Frechet_derivative(Iterator1 Func_begin, Iterator1 Func_end, Iterator2 value1_begin, Iterator2 value2_end)
+{
+	auto Func_dist = std::distance(Func_begin, Func_end);
+	auto value1_dist = std::distance(value1_begin, value2_end);
+
+	if(Func_dist != value1_dist || Func_dist < 3) throw std::invalid_argument("Frechet_derivative: Lenghts of Fuunction and Argument not eqval");
+
+	using Func_tupe = std::decay_t< decltype(*Func_begin) >;
+	using value1_type = std::decay_t< decltype(*value1_begin) >;
+
+	using result_tupe = decltype( std::declval<Func_tupe> / std::declval<value1_type> );
+
+	size_t N = Func_dist;
+
+	std::vector<result_tupe> result(N, 0);
+
+	for(size_t i=0; i < N; ++i){
+		if(i == 0) result[i] = (*(Func_begin + i + 1) - *(Func_begin + i) ) / ( *(value1_begin + i + 1) - *(value1_begin + i));
+		else if(i == N) result[i] = (*(Func_begin + i) - *(Func_begin + i - 1) ) / ( *(value1_begin + i) - *(value1_begin + i - 1));
+		else result[i] = (*(Func_begin + i + 1) - *(Func_begin + i - 1) ) / ( *(value1_begin + i + 1) - *(value1_begin + i - 1));      
+	}
+
+	return result;
+}
+
+template<typename T1, typename T2>
+auto Frechet_derivative(T1 Func, T2 Value){
+	return Frechet_derivative(Func.begin(), Func.end(), Value.begin(), Value.end());
+}
+
+
+template<typename Iterator1, typename T>
+auto Frechet_derivative(Iterator1 Func_begin, Iterator1 Func_end, matrix<T> M)
+{
+	auto Func_dist = std::distance(Func_begin, Func_end);
+
+	if(Func_dist != M.size_row()) throw std::invalid_argument("Frechet_derivative: Lenghts of Function and size row of Matrix not eqval! ");
+
+	size_t N_row = M.size_row();
+
+	size_t N_col = M.size_col();
+
+	matrix<T> result(N_row, N_col);
+
+	for(size_t i=0; i < N_col; ++i){
+		for(size_t j=0; j < N_row; ++j){
+			if(j == 0) result[i][j] = (*(Func_begin + j + 1) - *(Func_begin + j - 1) ) / ( M[i][j + 1] - M[i][j]);
+			else if (j == (N_col - 1)) result[i][j] = (*(Func_begin + j) - *(Func_begin + j - 1) ) / ( M[i][j] - M[i][j - 1]);
+			else result[i][j] = (*(Func_begin + j + 1) - *(Func_begin + j - 1) ) / ( M[i][j + 1] - M[i][j - 1]);
+		}
+	}
+
+	return result;
+}
+
+template<typename T1, typename T2>
+auto Frechet_derivative(T1 Func, matrix<T2> M){
+	return Frechet_derivative(Func.begin(), Func.end(), M);
+}
+
+
+template<typename Iterator1, typename T>
+auto Hessian(Iterator1 Func_begin, Iterator1 Func_end, matrix<T> M)
+{
+	auto Func_dist = std::distance(Func_begin, Func_end);
+
+	if(Func_dist != M.size_row()) throw std::invalid_argument("Hessian: Lenghts of Function and size row of Matrix not eqval! ");
+
+	matrix<T> derivative = Frechet_derivative(Func_begin, Func_end, M);
+
+	std::vector<matrix<T>> Hes(Func_dist);
+
+	size_t N = M.size_col();
+
+	for(size_t m=0; m < Func_dist; ++m){
+		Hes[m].resize(N, N);
+
+		for(size_t i=0; i < N; ++i){
+			for(size_t j=0; j < N; ++j){
+				if(m < 1) Hes[m][i][j] = (derivative[m + 1][j] - derivative[m][j]) / (M[m + 1][i] - M[m][i]);
+				else if(m >= N - 1) Hes[m][i][j] = (derivative[m][j] - derivative[m - 1][j]) / (M[m][i] - M[m - 1][i]);
+				else Hes[m][i][j] = (derivative[m + 1][j] - derivative[m - 1][j]) / (M[m + 1][i] - M[m - 1][i]);
+			}
+		}
+	}
+
+	return Hes;
+}
+
+
+template<typename Iterator1, typename Iterator2)
+auto Hessian(Iterator1 Func_begin, Iterator1 Func_end, Iterator2 value1_begin, Iterator2 value2_end)
+{
+	auto H = Frechet_derivative(Func_begin, Func_end, value1_begin, value2_end);
+	return H_2 = Frechet_derivative(H.begin(), H.end(), value1_begin, value2_end);
+}
+
+
+template<size_t Index1, size_t Index2, typename Tag, typename T, typename Iterator1, typename Iterator2, typename Func, typename... Args>
+auto Method_Newton(Tag tag, T error=1.0, size_t max_iter=100, Iterator1 data_b, Iterator1 data_e, Func& func, Args&&... args)
+{
+	static_assert(Index1 < sizeof...(Args), "First Index out of range!");
+	static_assert(Index2 < sizeof...(Args), "Second Index out of range!");
+
+	auto tuple = std::forward_as_tuple(args...);
+
+	Iterator2 f_b = std::get<Index1>(typle);
+	Iterator2 f_e = std::get<Index2>(typle);
+
+	auto dist_data = std::distanse(data_b, dtat_e);
+	auto dist_f = std::distance(f_b, f_e);
+
+	auto res = std::apply(func, typle);
+
+	if(res.size() != dist_data) throw std::invalid_argument("Method_Newton: Lenght of results function and parametrs vector not equel!")
+
+	using par_type = std::decay_t<decltype(*f_b)>;
+	using data_type = std::decay_t<decltype(*data_b)>;
+	using res_type = std::decay_t<decltype(*res.begin)>;
+	using dres_type = decltype( std::declval<res_type>() - std::declval<data_type>() );
+
+	dres_type derror = Norm_FuncSpace(tag, res.begin(), res.end(), data_b, data_e) / Norm_FuncSpace( data_b, data_e);
+
+	std::vector<par_type> result;
+	result.insert(result.begin(), f_b, f_e);
+
+	std::get<Index1>(typle) = result.begin();
+	std::get<Index2>(typle) = result.end();
+
+	size_t iteration = 0;
+
+	std::vector<dres_type> ln_past;
+	std::vector<dres_type> ln_past_grad;
+
+	while(derror > error && iteration < max_iter){
+
+		std::vector<dres_type> rn(res.size());
+		std::transform(
+			res.begin(), res.end(),
+			data_b,
+			rn.begin(),
+			[](res_type a, data_type b) { return a - b; }
+		);
+
+		std::vector<dres_type> ln = Frechet_derivative(rn.begin(), rn.end(), data_b, data_e);
+		std::vector<dres_type> ln_grad(res.size());
+
+		dres_type B;
+
+		if(iteration){
+			ln_past = ln;
+			ln_grad = ln;
+			ln_past_grad = ln;
+		} else {
+			dres_type ln_norm = Norm_FuncSpace(tag, ln.begin(), ln.end());
+			dres_type ln_norm_past = Norm_FuncSpace(tag, ln_past.begin(), ln_past.end());
+			dres_type B = ln_norm * ln_norm / (ln_norm_past * ln_norm_past);
+			std::transform(
+				ln.begin(), ln.end(),
+				ln_past_grad.begin(),
+				ln_grad.begin(),
+				[](dres_type a, dres_type b) { return a - B * b; }
+			);
+		}
+		
+		std::vector<dres_type> H = Frechet_derivative(ln_grad.begin(), ln_grad.end(), data_b, data_e);
+		std::vector<dres_type> gn = Hessian(H.begin(), H.end(), data_b, data_e);
+
+		matrix<dres_type> H_ln(1, res.size());
+		for(size_t i=0, i < H_ln.size_col(); ++i) H_ln[0][i] = H[i];
+
+		dres_type gn_norm = Norm_FuncSpace(tag, gn_norm.begin(), gn_norm.end());
+		gn_norm *= gn_norm;
+
+		dres_type k_grad = H_ln(ln) / g_norm;
+
+		std::transform(
+			result.begin(), result.end(),
+			H.begin(),
+			result.begin(),
+			[](par_type m, dres_type b) { return m - k_grad * b; }
+		);
+
+		res = std::apply(func, typle);
+
+		derror = Norm_FuncSpace(tag, res.begin(), res.end(), data_b, data_e) / Norm_FuncSpace( data_b, data_e);
+
+		++iteration;
+	}
+	
+	return result;
+}
+
+
+}
 
 //===============================================================================Test_modul=========================================================================================
 

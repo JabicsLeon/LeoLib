@@ -110,12 +110,22 @@ namespace leo
 
 			T moda();
 
+			T amount();
+
+			T amount_abs();
+
 			template<class U>
 			vector<U> cast_to() const;
 
 			vector projection(vector& vec);
 
 	};
+
+	template<typename Iteretir1, typename Iteretir2>
+	auto scalarmult(Iteretir1 beg1, Iteretir1 end1, Iteretir2 beg2, Iteretir2 end2);
+
+	template<typename cont1, typename cont2>
+	auto scalarmult(cont1 c1, cont2 c2);
 
 	template<class T, typename... Args>
 	vector<T> vecmult(Args&&... args);
@@ -224,6 +234,37 @@ namespace leo
 	}
 
 	template<class T>
+	T vector<T>::amount()
+	{
+		if (!(this -> size())) throw std::invalid_argument("leo::vector<T>::amount : vector is empty!");
+
+		T value = 0;
+
+		for (auto& it : *this)
+		{
+			value += it;
+		}
+
+		return value;
+	}
+
+	template<class T>
+	T vector<T>::amount_abs()
+	{
+		if (!(this -> size())) throw std::invalid_argument("leo::vector<T>::amount : vector is empty!");
+
+		T value = 0;
+
+		for (auto& it : *this)
+		{
+			value += std::abs(it);
+		}
+
+		return value;
+	}
+
+
+	template<class T>
 	template<class U>
 	vector<U> vector<T>::cast_to() const
 	{
@@ -238,7 +279,7 @@ namespace leo
 
 		return vec;
 	}
-	
+
 
 	//===================================================Operators_Realisation=================================================		
 	
@@ -369,7 +410,7 @@ namespace leo
 
 
 	template<class T1, class Scalar>
-	auto operator+(const vector<T1>& a, Scalar b) -> vector< decltype(std::declval<T1>() + std::declval<Scalar>()) >&
+	auto operator+(const vector<T1>& a, Scalar b) -> vector< decltype(std::declval<T1>() + std::declval<Scalar>()) >
 	{
 		size_t N = a.size();
 
@@ -492,6 +533,32 @@ namespace leo
 
 		return os;
 	}
+
+	//===================================================Same_Function_Realisation=================================================
+
+	template<typename Iteretir1, typename Iteretir2>
+	auto scalarmult(Iteretir1 beg1, Iteretir1 end1, Iteretir2 beg2, Iteretir2 end2)
+	{
+		auto len = std::distance(beg1, end1);
+
+		if (len != std::distance(beg2, end2)) throw std::invalid_argument("leo::scalarmult: sizes of vectors not equel");
+
+		auto value = 0.0;
+
+		for (size_t i=0; i < len; ++i)
+		{
+			value += *(beg1 + i) * *(beg2 + i);
+		}
+		
+		return value;
+	}
+
+	template<typename cont1, typename cont2>
+	auto scalarmult(cont1 c1, cont2 c2)
+	{
+		return scalarmult(c1.begin(), c1.end(), c2.begin(), c2.end());
+	}
+
 }
 
 //===============================================================================Matrix_modul=========================================================================================

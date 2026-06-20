@@ -1474,6 +1474,8 @@ namespace leo{
 		return tokens;
 	}
 
+	
+
 	inline std::stringstream ReadFile(const std::string& FileName){
 		std::ifstream file(FileName);
 		//file.open(FileName);
@@ -1494,6 +1496,7 @@ namespace leo{
 		file << is.rdbuf();
 		//file.close();
 	}
+
 }
 
 //===============================================================================Math_modul=========================================================================================
@@ -2502,109 +2505,258 @@ auto Hessian(Iterator1 Func_begin, Iterator1 Func_end, Iterator2 value1_begin, I
 	return Frechet_derivative(H.begin(), H.end(), value1_begin, value2_end);
 }
 
+}
 
+//===============================================================================Solve_linal_methods=========================================================================================
 
-template<size_t Index1, size_t Index2, typename Tag, typename T, typename Iterator1, typename Iterator2, typename Func, typename... Args>
-auto Method_Newton(Tag tag, T error/*=1.0*/, size_t max_iter/*=100*/, Iterator1 data_b, Iterator1 data_e, Func& func, Args&&... args)
+namespace leo{
+
+template<class T>
+class Regression
 {
-	static_assert(Index1 < sizeof...(Args), "First Index out of range!");
-	static_assert(Index2 < sizeof...(Args), "Second Index out of range!");
-
-	auto tuple = std::forward_as_tuple(args...);
-
-	Iterator2 f_b = std::get<Index1>(tuple);
-	Iterator2 f_e = std::get<Index2>(tuple);
-
-	auto dist_data = std::distance(data_b, data_e);
-	auto dist_f = std::distance(f_b, f_e);
-
-	auto res = std::apply(func, tuple);
-
-	if(res.size() != dist_data) throw std::invalid_argument("Method_Newton: Lenght of results function and parametrs vector not equel!");
-
-	using par_type = std::decay_t<decltype(*f_b)>;
-	using data_type = std::decay_t<decltype(*data_b)>;
-	using res_type = std::decay_t<decltype(*res.begin)>;
-	using dres_type = decltype( std::declval<res_type>() - std::declval<data_type>() );
-
-	dres_type derror = Norm_FuncSpace(tag, res.begin(), res.end(), data_b, data_e) / Norm_FuncSpace( data_b, data_e);
-
-	std::vector<par_type> result;
-	result.insert(result.begin(), f_b, f_e);
-
-	std::get<Index1>(tuple) = result.begin();
-	std::get<Index2>(tuple) = result.end();
-
-	size_t iteration = 0;
-
-	std::vector<dres_type> ln_past;
-	std::vector<dres_type> ln_past_grad;
-
-	while(derror > error && iteration < max_iter){
-
-		std::vector<dres_type> rn(res.size());
-		std::transform(
-			res.begin(), res.end(),
-			data_b,
-			rn.begin(),
-			[](res_type a, data_type b) { return a - b; }
-		);
-
-		std::vector<dres_type> ln = Frechet_derivative(rn.begin(), rn.end(), data_b, data_e);
-		std::vector<dres_type> ln_grad(res.size());
-
-		dres_type B;
-
-		if(iteration){
-			ln_past = ln;
-			ln_grad = ln;
-			ln_past_grad = ln;
-		} else {
-			dres_type ln_norm = Norm_FuncSpace(tag, ln.begin(), ln.end());
-			dres_type ln_norm_past = Norm_FuncSpace(tag, ln_past.begin(), ln_past.end());
-			dres_type B = ln_norm * ln_norm / (ln_norm_past * ln_norm_past);
-			std::transform(
-				ln.begin(), ln.end(),
-				ln_past_grad.begin(),
-				ln_grad.begin(),
-				[](dres_type a, dres_type b) { return a - B * b; }
-			);
-		}
+	private:
+		bool _fit_init_ = false;
+		int level = 1;
+		int space = 1;
+		std::vector<T> cofs = {0, 0};
 		
-		std::vector<dres_type> H = Frechet_derivative(ln_grad.begin(), ln_grad.end(), data_b, data_e);
-		std::vector<dres_type> gn = Hessian(H.begin(), H.end(), data_b, data_e);
-
-		matrix<dres_type> H_ln(1, res.size());
-		for(size_t i=0; i < H_ln.size_col(); ++i) H_ln[0][i] = H[i];
-
-		dres_type gn_norm = Norm_FuncSpace(tag, gn_norm.begin(), gn_norm.end());
-		gn_norm *= gn_norm;
-
-		dres_type k_grad = H_ln(ln) / gn_norm;
-
-		std::transform(
-			result.begin(), result.end(),
-			H.begin(),
-			result.begin(),
-			[](par_type m, dres_type b) { return m - k_grad * b; }
-		);
-
-		res = std::apply(func, tuple);
-
-		derror = Norm_FuncSpace(tag, res.begin(), res.end(), data_b, data_e) / Norm_FuncSpace( data_b, data_e);
-
-		++iteration;
-	}
+		void change_level(size_t l);
 	
+		void change_space(size_t s);
+	public:
+		Regression(size_t l, size_t s) : level(l), space(s)
+		{
+			cofs.resize(l * s + 1);
+		}
+
+		Regression(size_t l) : level(l)
+		{
+			 cofs.resize(l + 1);
+		}
+
+		template<typename U1, typename U2>
+		std::vector<T> fit(std::vector<U1> X, std::vector<U2> Y);
+
+		template<typename U1, typename U2>
+		std::vector<T> fit(matrix<U1> X, std::vector<U2> Y);
+
+		template<typename Iterator1, typename Iterator2>
+		std::vector<T> fit(Iterator1 X_begin, Iterator1 X_end, Iterator2 Y_begin, Iterator2 Y_end);
+
+		template<typename U1>
+		std::vector<T> predict(std::vector<U1> X);
+
+		template<typename U1>
+		std::vector<T> predict(matrix<U1> X);
+
+		template<typename Iterator1>
+		std::vector<T> predict(Iterator1 X_begin, Iterator1 X_end);
+
+		template<typename U1>
+		void ignore(U1 func);
+
+		template<typename U1>
+		void quest(U1 func);
+};
+
+template<class T>
+void Regression<T>::change_level(size_t l)
+{
+	this -> level = l;
+	cofs.resize(l * this -> space + 1);
+}
+
+template<class T>
+void Regression<T>::change_space(size_t s)
+{
+	this -> space = s;
+	cofs.resize(this -> level * s + 1);
+}
+
+
+template<class T>
+template<typename Iterator1, typename Iterator2>
+std::vector<T> Regression<T>::fit(Iterator1 X_begin, Iterator1 X_end, Iterator2 Y_begin, Iterator2 Y_end)
+{
+	auto X_len = std::distance(X_begin, X_end);
+	auto Y_len = std::distance(Y_begin, Y_end);
+	
+	if (X_len != Y_len) throw std::invalid_argument("Error in Regression::fit : size of X and Y not equel!");
+
+	if (this -> space != 1) this -> change_space(1);
+
+	int lenght = this -> cofs.size();
+
+	matrix<T> AX_vec(X_len, lenght);
+	std::vector<T> AY_vec(X_len);
+
+	for (int i = 0; i < X_len; ++i)
+	{
+		for (int j = 0; j < lenght - 1; ++j)
+		{
+			T value = 1;
+			for (int k = 0; k < this -> level - j; ++k)
+			{
+				value *= *(X_begin + i);
+			}
+
+			AX_vec[i][j] = value;
+		}
+
+		AX_vec[i][lenght - 1] = 1;
+
+		AY_vec[i] = *(Y_begin + i);
+	}
+
+	auto cof  = solve(AX_vec, AY_vec);
+	
+	this -> cofs = cof;
+	this -> _fit_init_ = true;
+
+	return cof;
+}
+
+
+template<class T>
+template<typename U1, typename U2>
+std::vector<T> Regression<T>::fit(std::vector<U1> X, std::vector<U2> Y)
+{
+	return this -> fit(X.begin(), X.end(), Y.begin(), Y.end());
+}
+
+
+template<class T>
+template<typename U1, typename U2>
+std::vector<T> Regression<T>::fit(matrix<U1> X, std::vector<U2> Y)
+{
+	int lenght_Y = Y.size();
+
+	if (X.size_row() != lenght_Y) throw std::invalid_argument("Error in Regression::fit : size of X and Y not equel!");
+
+	if (this -> space != X.size_col()) this -> change_space( X.size_col() + 1 );
+
+	int num_features = X.size_col();
+	int degree = this -> level;
+
+	int lenght = num_features * degree + 1;
+
+	matrix<U1> X_new(X.size_row(), lenght);
+
+	for (size_t n = 0; n < X.size_row(); ++n)
+	{
+		size_t col = 0;
+		
+		for (size_t f = 0; f < num_features; ++f)
+		{
+			U1 value = X[n][f];
+			U2 power = value;
+
+			for (size_t d = 1; d <= degree; ++d)
+			{
+				X_new[n][col++] = power;
+				power *= value;
+			}
+		}
+	
+		X_new[n][lenght - 1] = static_cast<U1>(1);
+	}
+
+	auto cof  = solve(X_new, Y);
+
+	this -> cofs = cof;
+	this -> _fit_init_ = true;
+
+	return cof;
+}
+
+
+template<class T>
+template<typename Iterator1>
+std::vector<T> Regression<T>::predict(Iterator1 X_begin, Iterator1 X_end)
+{
+	if (!this -> _fit_init_) throw std::invalid_argument("Error in Regression class predict function: fit function did't work first!");
+
+	if (this -> space != 1) throw std::invalid_argument("Error in Regression class predict function: unexcepted matrix in space = 1!");
+
+	std::vector<T> result;
+	std::copy(X_begin, X_end, std::back_inserter(result));
+
+	for (auto& it : result)
+	{
+		T value = this -> cofs[level];
+
+		for (int i = 0; i + 1 < this -> cofs.size(); ++i)
+		{
+			T value_dop = 1;
+			for (int k = 0; k < level - i; ++k)
+			{
+				value_dop *= it;
+			}
+
+			value += this -> cofs[i] * value_dop;
+		}
+
+		it = value;
+	}
+
 	return result;
 }
 
 
+template<class T>
+template<typename U1>
+std::vector<T> Regression<T>::predict(std::vector<U1> X)
+{
+	return predict(X.begin(), X.end());
 }
 
-//===============================================================================Test_modul=========================================================================================
+
+template<class T>
+template<typename U1>
+std::vector<T> Regression<T>::predict(matrix<U1> X)
+{
+	if (!this -> _fit_init_) throw std::invalid_argument("Error in Regression class predict function: fit function did't work first!");
+
+	if (this -> space != X.size_col()) throw std::invalid_argument("Error in Regression class predict function: missspacing of matrix!");
+	
+	int degree = this -> level;
+	int num_features = this -> space;
+	int lenght = X.size_row();
+
+	std::vector<T> result;
+	result.reserve(lenght);
+	
+
+	for (int i = 0; i < lenght; ++i)
+	{
+		T value = 0.0;
+
+		for (int s = 0; s < num_features; ++s)
+		{
+			for (int d = 1; d <= degree; ++d)
+			{
+				T power = 1;
+				for (int j = 0; j < d; ++j)
+				{
+					power *= X[i][s];
+				}
+				power *= this -> cofs[s * degree + d - 1];
+				value += power;
+			}
+		}
+
+		value += this -> cofs[num_features * degree];
+		result.push_back(value);
+	}
+
+	return result; 
+
+}
 
 
+
+
+}
 
 
 

@@ -624,12 +624,23 @@ namespace leo{
 		friend std::ostream& operator<< <>(std::ostream& os, const matrix<T>& m);
 		friend matrix<T>& operator>> <>(std::istream& is, matrix<T>& m);
 
+			matrix(size_t r, size_t c, T value) : row(r), col(c) 
+			{
+				MATRIX.resize(row, std::vector<T>(col, value));
+				mat = row * col;
+			}
+
 			matrix(size_t r, size_t c) : row(r), col(c) {
 				MATRIX.resize(row, std::vector<T>(col, 0));
 				mat = row * col;
 				//LABELS.resize(2);
 				//LABELS[0].reserve(row);
 				//LABELS[1].reserve(col);
+			}
+
+			matrix() : row(0), col(0) 
+			{
+				mat = 0;
 			}
 			
 			matrix(const matrix<T>& A) : row(A.row), col(A.col), mat(A.mat), MATRIX(A.MATRIX)/*, LABELS(A.LABELS)*/ {}
@@ -863,12 +874,12 @@ namespace leo{
                         }
 
 			static matrix<T> ones(size_t r, size_t c){
-				matrix<T> result(r, c);
-				for(size_t i=0; i < r; ++i){
+				matrix<T> result(r, c, 1.0);
+				/*for(size_t i=0; i < r; ++i){
 					for(size_t j=0; j < c; ++j){
 						result[i][j] = 1;
 					}
-				}
+				}*/
 				return result;
 			}
 
@@ -995,6 +1006,34 @@ namespace leo{
 				}
 				return DET;
 			}
+
+
+			static T Sarrus_Method(const matrix<T>& A) //It works to matrix that have size less then 4*4
+			{
+				if (!A.is_square()) throw std::invalid_argument("Method_Laplas: matrix is not square!");
+				
+				int N = A.size_row(); if (N > 3) return Method_Laplas(A);
+				if (N == 1) return A[0][0];
+				T sum = 0.0;
+				
+				for (int idx = 0; idx < N; ++idx)
+				{
+					T mult_plus = 1.0;
+					T mult_minus = 1.0;
+					for (int i = 0; i < N; ++i)
+					{
+						T j = (idx + i < N ? i + idx : i + idx - N);
+						mult_plus *= A[j][i];
+						mult_minus *= A[j][N - i - 1];
+					}
+					sum += mult_plus - mult_minus;
+				}
+
+
+				return sum;
+			}
+
+
 
 
 			T det(){
@@ -2506,6 +2545,187 @@ auto Hessian(Iterator1 Func_begin, Iterator1 Func_end, Iterator2 value1_begin, I
 }
 
 }
+//===============================================================================Class_LUdecomposition=========================================================================================
+
+namespace leo
+{
+	template<typename T>
+	class LUdecomposition
+	{
+		private:
+			int Size = 0;
+			int detP = 1;
+			std::vector<size_t> perm;
+			matrix<T> L;
+			matrix<T> U;
+			matrix<T> A;
+		public:
+			LUdecomposition(){};
+
+			void decLU(matrix<T> B);
+			
+			LUdecomposition(matrix<T> B) { decLU(B); };
+
+			matrix<T> getL() { return L; };
+			matrix<T> getU() { return U; };
+			matrix<T> getA() { return A; };
+			int getDetP() { return detP; };
+			int size() { return Size * Size; };
+			int square_size() { return Size; };
+
+			T det();
+	
+			template<typename Iterator>
+			vector<T> solve(Iterator B_begin, Iterator B_end);
+
+			vector<T> solve(std::vector<T> B);
+
+			matrix<T> inverse();		
+	};
+
+	template<typename T>
+	void LUdecomposition<T>::decLU(matrix<T> B)
+	{
+		if (!B.is_square()) throw std::invalid_argument("LU decomposition: matrix is not square!");
+		
+		int n = B.size_row();
+
+		this -> L.resize(n, n);
+		this -> A = B;
+		this -> Size = n;
+
+		this -> perm.clear();
+		this -> perm.resize(n);
+		std::iota(this -> perm.begin(), this -> perm.end(), 0);		
+
+		for(size_t k=0; k < n; ++k)
+		{
+			auto col_begin = typename matrix<T>::iterator_vertical(&B, k, k);
+			auto col_end = typename matrix<T>::iterator_vertical(&B, n - 1, k);
+			auto it  = std::max_element(col_begin, col_end);
+			auto dist_in_col = std::distance(col_begin, it);
+			if(dist_in_col != k) 
+			{
+				B.swap_row(k, k + dist_in_col);
+				this -> L.swap_row(k, k + dist_in_col);
+				this -> detP *= -1;
+				std::swap(this -> perm[k], this -> perm[k + dist_in_col]);
+			}
+
+			if(std::abs(B[k][k]) < 1e-10) throw std::invalid_argument("LU decomposition: matrix is singular");
+
+			T pivot = B[k][k];
+			this -> L[k][k] = 1;
+
+			for(size_t i=k+1; i < n; ++i)
+			{
+				T factor = B[i][k] / pivot;
+				this -> L[i][k] = factor;
+				B[i][k] = 0;
+				if(std::abs(factor) > 1e-10) 
+				{
+					for(size_t j=k + 1; j < n; ++j)
+					{
+						B[i][j] -= factor * B[k][j];
+					}
+				}
+			}
+		}
+
+		this -> U = B;
+	}
+
+
+	template<typename T>
+	T LUdecomposition<T>::det()
+	{
+		T mult = 1;
+		int N = this -> Size;
+		if (!N) throw std::invalid_argument("LU decomposition: decomposition is empty! (No init)");
+
+		for (int i = 0; i < N; ++i)
+		{
+			mult *= this -> U[i][i];
+		}
+
+		mult *= this -> detP;
+
+		return mult;
+	}
+
+	
+	template<typename T>
+	template<typename Iterator>
+	vector<T> LUdecomposition<T>::solve(Iterator B_begin, Iterator B_end)
+	{
+		auto N = std::distance(B_begin, B_end);
+		if (!this -> Size) throw std::invalid_argument("LU decomposition ::solve: decomposition is empty! (No init)");
+		if (!N || N != this -> Size) throw std::invalid_argument("LU decomposition ::solve: invalid lenght of input vector!");
+
+		vector<T> Y;
+		Y.resize(N);
+		for (int i = 0; i < N; ++i) 
+		{
+			Y[this -> perm[i]] = *B_begin;
+			B_begin++;
+		}
+
+		for (int i = 1; i < N; ++i)
+		{
+			T sum = 0;
+
+			for (int j = 0; j < i; ++j)
+			{
+				sum += this -> L[i][j] * Y[j];
+			}
+			Y[i] -= sum;
+		}
+
+		vector<T> X(N, 0);
+		X[N - 1] = Y[N - 1] / this -> U[N - 1][N - 1];
+
+		for (int i = N - 2; i >= 0; --i)
+		{
+			T sum = 0;
+			for (int j = i + 1; j < N; ++j)
+			{
+				sum += this -> U[i][j] * X[j];
+			}
+	
+			X[i] = 1 / (this -> U[i][i]) * (Y[i] - sum);
+		}
+
+		return X;
+	}
+
+	template<typename T>
+	vector<T> LUdecomposition<T>::solve(std::vector<T> B) 
+	{ return this -> solve(B.begin(), B.end());}
+
+
+	template<typename T>
+	matrix<T> LUdecomposition<T>::inverse()
+	{
+		int N = this -> Size;
+		if (!N) throw std::invalid_argument("LU decomposition ::inverse: decomposition is empty! (No init)");
+
+		matrix<T> A_inv(N, N);
+		matrix<T> E = matrix<T>::identity(N);
+
+		for (int i = 0; i < N; ++i)
+		{
+			vector<T> X = this -> solve(E.Column(i).begin(), E.Column(i).end());
+			std::copy(X.begin(), X.end(), A_inv.Column(i).begin());
+		}
+
+		return A_inv;
+	}
+	
+}
+
+
+
+
 
 //===============================================================================Solve_linal_methods=========================================================================================
 
@@ -2514,63 +2734,63 @@ namespace leo{
 template<class T>
 class Regression
 {
-	private:
-		bool _fit_init_ = false;
-		int level = 1;
-		int space = 1;
-		std::vector<T> cofs = {0, 0};
-		
-		void change_level(size_t l);
-	
-		void change_space(size_t s);
-	public:
-		Regression(size_t l, size_t s) : level(l), space(s)
-		{
-			cofs.resize(l * s + 1);
-		}
+    private:
+        bool _fit_init_ = false;
+        int level = 1;
+        int space = 1;
+        std::vector<T> cofs = {0, 0};
+        
+        void change_level(size_t l);
+    
+        void change_space(size_t s);
+    public:
+        Regression(size_t l, size_t s) : level(l), space(s)
+        {
+            cofs.resize(l * s + 1);
+        }
 
-		Regression(size_t l) : level(l)
-		{
-			 cofs.resize(l + 1);
-		}
+        Regression(size_t l) : level(l)
+        {
+             cofs.resize(l + 1);
+        }
 
-		template<typename U1, typename U2>
-		std::vector<T> fit(std::vector<U1> X, std::vector<U2> Y);
+        template<typename U1, typename U2>
+        std::vector<T> fit(std::vector<U1> X, std::vector<U2> Y);
 
-		template<typename U1, typename U2>
-		std::vector<T> fit(matrix<U1> X, std::vector<U2> Y);
+        template<typename U1, typename U2>
+        std::vector<T> fit(matrix<U1> X, std::vector<U2> Y);
 
-		template<typename Iterator1, typename Iterator2>
-		std::vector<T> fit(Iterator1 X_begin, Iterator1 X_end, Iterator2 Y_begin, Iterator2 Y_end);
+        template<typename Iterator1, typename Iterator2>
+        std::vector<T> fit(Iterator1 X_begin, Iterator1 X_end, Iterator2 Y_begin, Iterator2 Y_end);
 
-		template<typename U1>
-		std::vector<T> predict(std::vector<U1> X);
+        template<typename U1>
+        std::vector<T> predict(std::vector<U1> X);
 
-		template<typename U1>
-		std::vector<T> predict(matrix<U1> X);
+        template<typename U1>
+        std::vector<T> predict(matrix<U1> X);
 
-		template<typename Iterator1>
-		std::vector<T> predict(Iterator1 X_begin, Iterator1 X_end);
+        template<typename Iterator1>
+        std::vector<T> predict(Iterator1 X_begin, Iterator1 X_end);
 
-		template<typename U1>
-		void ignore(U1 func);
+        template<typename U1>
+        void ignore(U1 func);
 
-		template<typename U1>
-		void quest(U1 func);
+        template<typename U1>
+        void quest(U1 func);
 };
 
 template<class T>
 void Regression<T>::change_level(size_t l)
 {
-	this -> level = l;
-	cofs.resize(l * this -> space + 1);
+    this -> level = l;
+    cofs.resize(l * this -> space + 1);
 }
 
 template<class T>
 void Regression<T>::change_space(size_t s)
 {
-	this -> space = s;
-	cofs.resize(this -> level * s + 1);
+    this -> space = s;
+    cofs.resize(this -> level * s + 1);
 }
 
 
@@ -2578,42 +2798,42 @@ template<class T>
 template<typename Iterator1, typename Iterator2>
 std::vector<T> Regression<T>::fit(Iterator1 X_begin, Iterator1 X_end, Iterator2 Y_begin, Iterator2 Y_end)
 {
-	auto X_len = std::distance(X_begin, X_end);
-	auto Y_len = std::distance(Y_begin, Y_end);
-	
-	if (X_len != Y_len) throw std::invalid_argument("Error in Regression::fit : size of X and Y not equel!");
+    auto X_len = std::distance(X_begin, X_end);
+    auto Y_len = std::distance(Y_begin, Y_end);
+    
+    if (X_len != Y_len) throw std::invalid_argument("Error in Regression::fit : size of X and Y not equel!");
 
-	if (this -> space != 1) this -> change_space(1);
+    if (this -> space != 1) this -> change_space(1);
 
-	int lenght = this -> cofs.size();
+    int lenght = this -> cofs.size();
 
-	matrix<T> AX_vec(X_len, lenght);
-	std::vector<T> AY_vec(X_len);
+    matrix<T> AX_vec(X_len, lenght);
+    std::vector<T> AY_vec(X_len);
 
-	for (int i = 0; i < X_len; ++i)
-	{
-		for (int j = 0; j < lenght - 1; ++j)
-		{
-			T value = 1;
-			for (int k = 0; k < this -> level - j; ++k)
-			{
-				value *= *(X_begin + i);
-			}
+    for (int i = 0; i < X_len; ++i)
+    {
+        for (int j = 0; j < lenght - 1; ++j)
+        {
+            T value = 1;
+            for (int k = 0; k < this -> level - j; ++k)
+            {
+                value *= *(X_begin + i);
+            }
 
-			AX_vec[i][j] = value;
-		}
+            AX_vec[i][j] = value;
+        }
 
-		AX_vec[i][lenght - 1] = 1;
+        AX_vec[i][lenght - 1] = 1;
 
-		AY_vec[i] = *(Y_begin + i);
-	}
+        AY_vec[i] = *(Y_begin + i);
+    }
 
-	auto cof  = solve(AX_vec, AY_vec);
-	
-	this -> cofs = cof;
-	this -> _fit_init_ = true;
+    auto cof  = solve(AX_vec, AY_vec);
+    
+    this -> cofs = cof;
+    this -> _fit_init_ = true;
 
-	return cof;
+    return cof;
 }
 
 
@@ -2621,7 +2841,7 @@ template<class T>
 template<typename U1, typename U2>
 std::vector<T> Regression<T>::fit(std::vector<U1> X, std::vector<U2> Y)
 {
-	return this -> fit(X.begin(), X.end(), Y.begin(), Y.end());
+    return this -> fit(X.begin(), X.end(), Y.begin(), Y.end());
 }
 
 
@@ -2629,44 +2849,44 @@ template<class T>
 template<typename U1, typename U2>
 std::vector<T> Regression<T>::fit(matrix<U1> X, std::vector<U2> Y)
 {
-	int lenght_Y = Y.size();
+    int lenght_Y = Y.size();
 
-	if (X.size_row() != lenght_Y) throw std::invalid_argument("Error in Regression::fit : size of X and Y not equel!");
+    if (X.size_row() != lenght_Y) throw std::invalid_argument("Error in Regression::fit : size of X and Y not equel!");
 
-	if (this -> space != X.size_col()) this -> change_space( X.size_col() + 1 );
+    if (this -> space != X.size_col()) this -> change_space( X.size_col() + 1 );
 
-	int num_features = X.size_col();
-	int degree = this -> level;
+    int num_features = X.size_col();
+    int degree = this -> level;
 
-	int lenght = num_features * degree + 1;
+    int lenght = num_features * degree + 1;
 
-	matrix<U1> X_new(X.size_row(), lenght);
+    matrix<U1> X_new(X.size_row(), lenght);
 
-	for (size_t n = 0; n < X.size_row(); ++n)
-	{
-		size_t col = 0;
-		
-		for (size_t f = 0; f < num_features; ++f)
-		{
-			U1 value = X[n][f];
-			U2 power = value;
+    for (size_t n = 0; n < X.size_row(); ++n)
+    {
+        size_t col = 0;
+        
+        for (size_t f = 0; f < num_features; ++f)
+        {
+            U1 value = X[n][f];
+            U2 power = value;
 
-			for (size_t d = 1; d <= degree; ++d)
-			{
-				X_new[n][col++] = power;
-				power *= value;
-			}
-		}
-	
-		X_new[n][lenght - 1] = static_cast<U1>(1);
-	}
+            for (size_t d = 1; d <= degree; ++d)
+            {
+                X_new[n][col++] = power;
+                power *= value;
+            }
+        }
+    
+        X_new[n][lenght - 1] = static_cast<U1>(1);
+    }
 
-	auto cof  = solve(X_new, Y);
+    auto cof  = solve(X_new, Y);
 
-	this -> cofs = cof;
-	this -> _fit_init_ = true;
+    this -> cofs = cof;
+    this -> _fit_init_ = true;
 
-	return cof;
+    return cof;
 }
 
 
@@ -2674,32 +2894,32 @@ template<class T>
 template<typename Iterator1>
 std::vector<T> Regression<T>::predict(Iterator1 X_begin, Iterator1 X_end)
 {
-	if (!this -> _fit_init_) throw std::invalid_argument("Error in Regression class predict function: fit function did't work first!");
+    if (!this -> _fit_init_) throw std::invalid_argument("Error in Regression class predict function: fit function did't work first!");
 
-	if (this -> space != 1) throw std::invalid_argument("Error in Regression class predict function: unexcepted matrix in space = 1!");
+    if (this -> space != 1) throw std::invalid_argument("Error in Regression class predict function: unexcepted matrix in space = 1!");
 
-	std::vector<T> result;
-	std::copy(X_begin, X_end, std::back_inserter(result));
+    std::vector<T> result;
+    std::copy(X_begin, X_end, std::back_inserter(result));
 
-	for (auto& it : result)
-	{
-		T value = this -> cofs[level];
+    for (auto& it : result)
+    {
+        T value = this -> cofs[level];
 
-		for (int i = 0; i + 1 < this -> cofs.size(); ++i)
-		{
-			T value_dop = 1;
-			for (int k = 0; k < level - i; ++k)
-			{
-				value_dop *= it;
-			}
+        for (int i = 0; i + 1 < this -> cofs.size(); ++i)
+        {
+            T value_dop = 1;
+            for (int k = 0; k < level - i; ++k)
+            {
+                value_dop *= it;
+            }
 
-			value += this -> cofs[i] * value_dop;
-		}
+            value += this -> cofs[i] * value_dop;
+        }
 
-		it = value;
-	}
+        it = value;
+    }
 
-	return result;
+    return result;
 }
 
 
@@ -2707,7 +2927,7 @@ template<class T>
 template<typename U1>
 std::vector<T> Regression<T>::predict(std::vector<U1> X)
 {
-	return predict(X.begin(), X.end());
+    return predict(X.begin(), X.end());
 }
 
 
@@ -2715,48 +2935,51 @@ template<class T>
 template<typename U1>
 std::vector<T> Regression<T>::predict(matrix<U1> X)
 {
-	if (!this -> _fit_init_) throw std::invalid_argument("Error in Regression class predict function: fit function did't work first!");
+    if (!this -> _fit_init_) throw std::invalid_argument("Error in Regression class predict function: fit function did't work first!");
 
-	if (this -> space != X.size_col()) throw std::invalid_argument("Error in Regression class predict function: missspacing of matrix!");
-	
-	int degree = this -> level;
-	int num_features = this -> space;
-	int lenght = X.size_row();
+    if (this -> space != X.size_col()) throw std::invalid_argument("Error in Regression class predict function: missspacing of matrix!");
+    
+    int degree = this -> level;
+    int num_features = this -> space;
+    int lenght = X.size_row();
 
-	std::vector<T> result;
-	result.reserve(lenght);
-	
+    std::vector<T> result;
+    result.reserve(lenght);
+    
 
-	for (int i = 0; i < lenght; ++i)
-	{
-		T value = 0.0;
+    for (int i = 0; i < lenght; ++i)
+    {
+        T value = 0.0;
 
-		for (int s = 0; s < num_features; ++s)
-		{
-			for (int d = 1; d <= degree; ++d)
-			{
-				T power = 1;
-				for (int j = 0; j < d; ++j)
-				{
-					power *= X[i][s];
-				}
-				power *= this -> cofs[s * degree + d - 1];
-				value += power;
-			}
-		}
+        for (int s = 0; s < num_features; ++s)
+        {
+            for (int d = 1; d <= degree; ++d)
+            {
+                T power = 1;
+                for (int j = 0; j < d; ++j)
+                {
+                    power *= X[i][s];
+                }
+                power *= this -> cofs[s * degree + d - 1];
+                value += power;
+            }
+        }
 
-		value += this -> cofs[num_features * degree];
-		result.push_back(value);
-	}
+        value += this -> cofs[num_features * degree];
+        result.push_back(value);
+    }
 
-	return result; 
+    return result;
+
+}
+
+
 
 }
 
+//===============================================================================Solve_linal_methods=========================================================================================
 
 
-
-}
 
 
 

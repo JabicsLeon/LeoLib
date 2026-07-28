@@ -119,6 +119,7 @@ namespace leo
 
 			vector projection(vector& vec);
 
+			static vector<T> randomvector(size_t N, T MinVal = 0, T MaxVal = 1);
 	};
 
 	template<typename Iteretir1, typename Iteretir2>
@@ -280,6 +281,16 @@ namespace leo
 		return vec;
 	}
 
+	template<class T>
+	static vector<T> vector<T>::randomvector(size_t N, T MinVal, T MaxVal)
+	{
+		vector<T> X(N);
+		std::mt19937 gen(std::random_device{}());
+		std::uniform_real_distribution<double> dist(MinVal, MaxVal);
+		std::generate(X.begin(), X.end(), [&gen, &dist] { return dist(gen); });
+
+		return X;
+	}
 
 	//===================================================Operators_Realisation=================================================		
 	
@@ -589,7 +600,10 @@ namespace leo{
 	auto  operator*(const matrix<T>& a, T b) -> matrix< decltype(std::declval<T>() * std::declval<Scalar>()) >;
 
 	template<class T, class Scalar> 
-	auto operator*(T b, const matrix<T>& a) -> matrix< decltype(std::declval<Scalar>() * std::declval<T>()) >;
+	auto operator*(Scalar b, const matrix<T>& a) -> matrix< decltype(std::declval<Scalar>() * std::declval<T>()) >;
+
+	template<class T, class Scalar>
+	auto operator/(const matrix<T>& a, Scalar b) -> matrix< decltype(std::declval<T>() / std::declval<Scalar>()) >;
 
 	template<class T>  
 	std::ostream& operator<<(std::ostream& os, const matrix<T>& m);
@@ -776,8 +790,8 @@ namespace leo{
 
 
 
-			void resize(size_t nrow, size_t ncol){
-				MATRIX.resize(nrow, std::vector<T>(ncol,0));
+			void resize(size_t nrow, size_t ncol, T value = 0){
+				MATRIX.resize(nrow, std::vector<T>(ncol,value));
 				row = nrow;
 				col = ncol;
 				mat = row * col;
@@ -862,6 +876,61 @@ namespace leo{
 					
 				erase_row(drow);
 				erase_col(dcol);
+			}
+
+
+			void insert_row(size_t prow, T value = 0)
+			{
+				if (prow > row) throw std::invalid_argument("Matrix insert row: Row index out of range");
+
+				MATRIX.insert(MATRIX.begin() + prow, std::vector(col, value));
+
+				row += 1;
+				mat = row * col;
+			}
+
+			template<typename Iterator>
+			void insert_row(size_t prow, Iterator b1, Iterator b2)
+			{
+				if (std::distance(b1, b2) != col || prow > row) throw std::invalid_argument("Matrix insert row: Row index out of range");
+
+				MATRIX.insert(MATRIX.begin() + prow, b1, b2);
+
+				row += 1;
+				mat = row * col;
+			}
+
+			template<typename cont>
+			void insert_row(size_t prow, cont c)
+			{
+				this -> insert_row(prow, c.begin(), c.end());
+			}
+
+			void insert_col(size_t pcol, T value = 0)
+			{
+				if (pcol > col) throw std::invalid_argument("Matrix insert column: Column index out of range");
+
+				for(size_t i=0; i < row; ++i) MATRIX[i].insert(MATRIX[i].begin() + pcol, value);
+
+				col += 1;
+				mat = row * col; 
+			}
+
+			template<typename Iterator>
+			void insert_col(size_t pcol, Iterator b1, Iterator b2)
+			{
+				if (std::distance(b1, b2) != row || pcol > col) throw std::invalid_argument("Matrix insert column: Column index out of range");
+
+				for(size_t i=0; i < row; ++i) MATRIX[i].insert(MATRIX[i].begin() + pcol, b1 + i);
+
+				col += 1;
+				mat = row * col;
+			}
+
+			template<typename cont>
+			void insert_col(size_t pcol, cont c)
+			{
+				this -> insert_col(pcol, c.begin(), c.end());
 			}
 
 			static matrix<T> identity(size_t n){
@@ -1172,6 +1241,14 @@ namespace leo{
 		return a + b;
 	}
 
+	template<class T, class Scalar>
+	auto operator+=(const matrix<T>& a, Scalar b) -> matrix< decltype(std::declval<T>() + std::declval<Scalar>()) >
+	{ return a + b; }
+
+	template<class T1,class T2>
+	auto operator+=(const matrix<T1>& a, const matrix<T2>& b) -> matrix< decltype(std::declval<T1>() + std::declval<T2>()) >
+	{ return a + b; }
+
 
 	template<class T1,class T2>
         auto operator-(const matrix<T1>& a, const matrix<T2>& b) -> matrix< decltype(std::declval<T1>() - std::declval<T2>()) >{
@@ -1219,6 +1296,14 @@ namespace leo{
 		return result;
 	}
 
+	template<class T, class Scalar>
+	auto operator-=(const matrix<T>& a, Scalar b) -> matrix< decltype(std::declval<T>() - std::declval<Scalar>()) >
+	{ return a - b; }
+
+	template<class T1, class T2>
+	auto operator-=(const matrix<T1>& a, const matrix<T2>& b) -> matrix< decltype(std::declval<T1>() - std::declval<T2>()) >
+	{ return a - b; }
+
 
 	template<class T, class Scalar>
         auto  operator*(Scalar b, const matrix<T>& a) -> matrix< decltype(std::declval<Scalar>() * std::declval<T>()) >{
@@ -1238,6 +1323,26 @@ namespace leo{
         auto operator*(const matrix<T>& a, Scalar b) -> matrix< decltype(std::declval<T>() * std::declval<Scalar>()) >{
 		return b * a;
 	}
+
+	template<class T, class Scalar>
+	auto operator*=(const matrix<T>& a, Scalar b) -> matrix< decltype(std::declval<T>() * std::declval<Scalar>()) >
+	{ return b * a; }
+
+	template<class T, class Scalar>
+	auto operator/(const matrix<T>& a, Scalar b) -> matrix< decltype(std::declval<T>() / std::declval<Scalar>()) >
+	{
+		//using ResultType = decltype(std::declval<T>() / std::declval<Scalar>());
+
+		matrix<T> result = a;
+		for(size_t i=0; i <  a.size_row(); ++i) for(size_t j=0; j <  a.size_col(); ++j) result[i][j] /= b;
+
+		return result;
+	}
+
+	template<class T, class Scalar>
+	auto operator/=(const matrix<T>& a, Scalar b) -> matrix< decltype(std::declval<T>() / std::declval<Scalar>()) >
+	{ return a / b; }
+	
 
 	template<class T>
 	std::ostream& operator<<(std::ostream& os, const matrix<T>& m){
@@ -2545,6 +2650,7 @@ auto Hessian(Iterator1 Func_begin, Iterator1 Func_end, Iterator2 value1_begin, I
 }
 
 }
+
 //===============================================================================Class_LUdecomposition=========================================================================================
 
 namespace leo
@@ -2574,11 +2680,16 @@ namespace leo
 			int square_size() { return Size; };
 
 			T det();
+
+			T algadd(size_t , size_t b);
+
+			matrix<T> algadd();
 	
 			template<typename Iterator>
 			vector<T> solve(Iterator B_begin, Iterator B_end);
 
-			vector<T> solve(std::vector<T> B);
+			template<typename cont>
+			vector<T> solve(cont B);
 
 			matrix<T> inverse();		
 	};
@@ -2699,7 +2810,8 @@ namespace leo
 	}
 
 	template<typename T>
-	vector<T> LUdecomposition<T>::solve(std::vector<T> B) 
+	template<typename cont>
+	vector<T> LUdecomposition<T>::solve(cont B) 
 	{ return this -> solve(B.begin(), B.end());}
 
 
@@ -2712,19 +2824,343 @@ namespace leo
 		matrix<T> A_inv(N, N);
 		matrix<T> E = matrix<T>::identity(N);
 
-		for (int i = 0; i < N; ++i)
+		std::vector<std::thread> t;
+		for (int i = 0; i < N; ++i) t.push_back( std::thread( [this, &E, &A_inv, i]
 		{
 			vector<T> X = this -> solve(E.Column(i).begin(), E.Column(i).end());
 			std::copy(X.begin(), X.end(), A_inv.Column(i).begin());
 		}
+		));
+
+		
+		for (int i = 0; i < N; ++i) t[i].join();
 
 		return A_inv;
+	}
+
+
+	template<typename T>
+	T LUdecomposition<T>::algadd(size_t a, size_t b)
+	{
+		int N = this -> Size;
+		if (!N) throw std::invalid_argument("LU decomposition ::algadd: decomposition is empty! (No init)");
+
+		matrix<T> At = this -> A;
+		LUdecomposition<T> lu(At.erase(a, b));
+		T result = lu.det() * ( (a + b) % 2 == 1 ? -1 : 1 );
+
+		return result;
+	}
+
+	template<typename T>
+	matrix<T> LUdecomposition<T>::algadd()
+	{
+		int N = this -> Size;
+
+		matrix<T> B;
+		std::vector<std::thread> t;
+		
+		for (size_t i = 0; i < N; ++i) for (size_t j = 0; j < N; ++j) t.push_back( std::thread([this, &B, i, j]{ B[i][j] = this -> algadd(i, j);}) );
+		for (int i = 0; i < N * N; ++i) t[i].join();
+
+		return B;
 	}
 	
 }
 
 
+//===============================================================================Class_QRdecomposition=========================================================================================
 
+namespace leo
+{
+	template<typename T>
+	class QRdecomposition
+	{
+		private:
+			int Size = 0;
+			matrix<T> Q;
+			matrix<T> R;
+			matrix<T> A;
+		public:
+			QRdecomposition(){};
+			
+			void decQR(matrix<T> B);
+
+			QRdecomposition(matrix<T> B) { decQR(B); };
+
+			matrix<T> getQ() { return Q; };
+			matrix<T> getR() { return R; };
+			matrix<T> getA() { return A; };
+			
+			int size() { return Size * Size; };
+			int square_size() { return Size; };
+		private:
+			void Gram_Schmidt_procces(matrix<T>& B);
+			void Householder_transformation(matrix<T>& B);
+	};
+
+	template<typename T>
+	void QRdecomposition<T>::Gram_Schmidt_procces(matrix<T>& B)
+	{
+		if (!B.is_square()) throw std::invalid_argument("QR decomposition: matrix is not square!");
+
+		int N = B.size_row();
+
+		this -> Q.resize(N,N);
+		this -> R.resize(N,N);
+		this -> A = B;
+
+
+		for (int k = 0; k < N; ++k)
+		{
+			vector<T> a(N); std::copy(B.Column(k).begin(), B.Column(k).end(), a.begin());
+
+			for (int i = 0; i < k; ++i)
+			{
+				this -> R[i][k] = scalarmult(a, this -> Q.Column(i));
+				
+				vector<T> q(N); std::copy(this -> Q.Column(i).begin(), this -> Q.Column(i).end(), q.begin());
+
+				a -= this -> R[i][k] * q;
+			}
+
+			this -> R[k][k] = a.abs();
+			a /= this -> R[k][k];
+
+			std::copy(a.begin(), a.end(), this -> Q.Column(k).begin());
+		}
+	}
+
+
+	template<typename T>
+	void QRdecomposition<T>::Householder_transformation(matrix<T>& B)
+	{
+		if (!B.is_square()) throw std::invalid_argument("QR decomposition: matrix is not square!");
+		
+		int N = B.size_row();
+		this -> Q = matrix<T>::identity(N);
+		this -> R = B;
+		this -> A = B;
+
+		for (int k = 0; k < N - 1; ++k)
+		{
+			vector<T> X(N - k); std::copy(this -> R.Column(k).begin() + k, this -> R.Column(k).end(), X.begin());
+
+			X[0] += (X[0] > 0 ? -1 : 1 ) * X.abs();
+			T beta = 2 / scalarmult(X, X);
+			
+
+			for (int j = k; j < N; ++j)
+			{
+				T dot = 0;
+				for (int i = k; i < N; ++i) dot += X[i - k] * this -> R[i][j];
+				dot *= beta;
+
+				std::transform(this -> R.Column(j).begin() + k, 
+						this -> R.Column(j).end(), 
+						X.begin(), 
+						this -> R.Column(j).begin() + k,
+						[dot] (T r, T x) { return r - dot * x;  });
+			}
+
+			for (int j = 0; j < N; ++j)
+			{
+				T dot = 0;
+				for (int i = k; i < N; ++i) dot += X[i - k] * this -> Q[i][j];
+				dot *= beta;
+
+				std::transform(this -> Q.Column(j).begin() + k, 
+						this -> Q.Column(j).end(),
+						X.begin(),
+						this -> Q.Column(j).begin() +k,
+						[dot] (T q, T x) { return q - dot * x;  });
+			}
+		}
+		
+		this -> R[N-1][N-1] *= -1;
+
+		for (int i = 0; i < N; ++i ) for (int j = i + 1; j < N; ++j)
+		{
+			this -> R[j][i] = 0;
+		}
+		
+	}
+
+
+	template<typename T>
+	void QRdecomposition<T>::decQR(matrix<T> B) 
+	{ 
+		//this -> Gram_Schmidt_procces(B); 
+		this -> Householder_transformation(B);
+	}
+
+
+
+}
+
+//===============================================================================Linals_vectors=========================================================================================
+
+namespace leo
+{
+	template<typename T>
+	vector<T> Eigenvalues(matrix<T> A, bool shift = true, double Error = 1e-2, int N_max = 100000)
+	{
+		int N = A.size_row();
+		QRdecomposition<T> qr(A);
+
+		vector<T> It1(N);
+		vector<T> It2(N);
+		matrix<T> E = matrix<T>::identity(N);
+
+		for (int i = 0; i < N; ++i) It1[i] = A[i][i];
+		
+		vector<T> lambda; lambda.reserve(N);
+
+		while (N_max > 0)
+		{
+			N_max--;
+
+			T mu = 0;
+			if (shift) mu = A[N - 1][N - 1];
+
+			qr.decQR(A -  mu * E);
+			A = qr.getR()(qr.getQ()) + mu * E;
+	
+			 for (int i = 0; i < N; ++i) It2[i] = A[i][i];
+
+			T error = (It2 - It1).abs();
+			if (error < Error) break;
+
+			It1 = It2;
+		}
+
+		for (int i = 0; i < A.size_row(); ++i) lambda.emplace_back(A[i][i]);
+		
+		return lambda;
+	}
+
+	template<typename T>
+	matrix<T> Eigenvectors(matrix<T> A, bool shift = true, bool lmShift = false, int N_max = 100000, double Error = 1e-2)
+	{
+		std::vector<T> lambda = Eigenvalues(A, shift);
+
+		int N = lambda.size();
+		int n = A.size_row();
+
+		matrix<T> Vecs(n, N);
+		matrix<T> E = matrix<T>::identity(n);
+		
+		T MaxVal = *std::max_element(A.AllColumn().begin(), A.AllColumn().end());
+		T MinVal = *std::min_element(A.AllColumn().begin(), A.AllColumn().end());
+		//vector<T> X(n) = vector<T>::randomvector(n, MaxVal, MinVal);
+		 
+
+		std::vector<std::thread> t;
+		for (int i = 0; i < N; ++i) t.push_back( std::thread( [&Vecs, &lambda, &A, &E, &Error, &lmShift, &n, &MaxVal, &MinVal, N_max, i]
+		{		
+			vector<T> X_past = vector<T>::randomvector(n, MaxVal, MinVal);
+			vector<T> X_new = X_past; 
+
+			LUdecomposition<T> lu(A - lambda[i] * E);
+			
+			int it = N_max;
+			T lm = lambda[i];
+		
+			while (it > 0)
+			{
+				it--;
+
+				if (lmShift) lu.decLU(A - lm * E);
+
+				vector<T> Y = lu.solve(X_new);
+
+				X_new = Y / Y.abs();
+
+				T error = (X_new - X_past).abs();
+
+				if (lmShift) T lm = lambda[i] + scalarmult(X_new, Y) / scalarmult(X_new, X_new);
+
+				if (error < Error) break;
+
+				X_past = X_new;
+			}
+
+			std::copy(X_new.begin(), X_new.end(), Vecs.Column(i).begin());
+		}));
+
+		for (int i = 0; i < N; ++i) t[i].join();
+
+
+		std::map<int, std::vector<int>> mp;
+		for (int i = 0; i < N; ++i) 
+		{
+			int value = lambda[i] + 0.5;
+			mp[value].push_back(i);
+		}
+
+		t.clear();
+		for (auto it : mp) if (it.second.size() > 1) t.push_back( std::thread( [&Vecs, it, n]
+		{
+			int N_i = it.second.size();
+			matrix<T> bais(n, N_i);
+			
+			for (int i = 0; i < N_i; ++i) std::copy(Vecs.Column(it.second[i]).begin(), 
+								Vecs.Column(it.second[i]).end(), 
+								bais.Column(i).begin());
+
+			QRdecomposition<T> qr(bais);
+
+			for (int i = 0; i < N_i; ++i) std::copy(qr.getQ().Column(i).begin(), 
+								qr.getQ().Column(i).end(), 
+								Vecs.Column(it.second[i]).begin());
+			
+		}));
+		
+		for (int i = 0; i < t.size(); ++i) t[i].join();
+
+		return Vecs;
+	}
+
+
+	template<typename T>
+	matrix<T> Eigenvectors(matrix<T> A, int etr, bool shift = true, bool lmShift = false, int N_max = 100000, double Error = 1e-2)
+	{
+		int N = A.size_row();
+		matrix<T> Vec = Eigenvectors(A, shift, lmShift, N_max, Error);
+		matrix<T> Vec_first = Vec;
+
+		int etr_it = etr;
+		
+		while (etr_it > 1)
+		{
+			etr_it--;
+			
+			matrix<T> Mit = Eigenvectors(A, shift, lmShift, N_max, Error);
+
+			for (int i = 0; i < N; ++i)
+			{
+				T idx = scalarmult(Vec_first.Column(i), Mit.Column(i));
+				if (idx < 0) for (auto& it : Mit.Column(i)) it = -it;
+			}
+
+			Vec += Mit;
+	
+		}
+	
+		Vec /= static_cast<double>(etr);
+
+		for (int i = 0; i < N; ++i)
+		{
+			T norm = scalarmult(Vec.Column(i), Vec.Column(i));
+			for (auto& it : Vec.Column(i)) it /= norm;
+		}
+		
+		return Vec;
+	}
+	
+
+
+}
 
 
 //===============================================================================Solve_linal_methods=========================================================================================
@@ -2976,8 +3412,6 @@ std::vector<T> Regression<T>::predict(matrix<U1> X)
 
 
 }
-
-//===============================================================================Solve_linal_methods=========================================================================================
 
 
 

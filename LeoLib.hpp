@@ -2723,7 +2723,7 @@ namespace leo
 				std::swap(this -> perm[k], this -> perm[k + dist_in_col]);
 			}
 
-			if(std::abs(B[k][k]) < 1e-10) throw std::invalid_argument("LU decomposition: matrix is singular");
+			if(std::abs(B[k][k]) < 1e-15) throw std::invalid_argument("LU decomposition: matrix is singular");
 
 			T pivot = B[k][k];
 			this -> L[k][k] = 1;
@@ -2902,16 +2902,15 @@ namespace leo
 	template<typename T>
 	void QRdecomposition<T>::Gram_Schmidt_procces(matrix<T>& B)
 	{
-		if (!B.is_square()) throw std::invalid_argument("QR decomposition: matrix is not square!");
-
 		int N = B.size_row();
+		int Ncol = B.size_col();
 
-		this -> Q.resize(N,N);
+		this -> Q.resize(N,Ncol);
 		this -> R.resize(N,N);
 		this -> A = B;
 
 
-		for (int k = 0; k < N; ++k)
+		for (int k = 0; k < Ncol; ++k)
 		{
 			vector<T> a(N); std::copy(B.Column(k).begin(), B.Column(k).end(), a.begin());
 
@@ -2925,7 +2924,8 @@ namespace leo
 			}
 
 			this -> R[k][k] = a.abs();
-			a /= this -> R[k][k];
+			if (this -> R[k][k] == 0) a /= this -> R[k][k] + 1e-15; //Noise!
+			else a /= this -> R[k][k];
 
 			std::copy(a.begin(), a.end(), this -> Q.Column(k).begin());
 		}
@@ -2947,7 +2947,9 @@ namespace leo
 			vector<T> X(N - k); std::copy(this -> R.Column(k).begin() + k, this -> R.Column(k).end(), X.begin());
 
 			X[0] += (X[0] > 0 ? -1 : 1 ) * X.abs();
-			T beta = 2 / scalarmult(X, X);
+			T beta; //= 2 / scalarmult(X, X);
+			if (scalarmult(X, X) < 1e-10) beta = 2 / (scalarmult(X, X) + 1e-15);  //Noise!
+			else beta = 2 / scalarmult(X, X);
 			
 
 			for (int j = k; j < N; ++j)
@@ -2977,7 +2979,7 @@ namespace leo
 			}
 		}
 		
-		this -> R[N-1][N-1] *= -1;
+		//this -> R[N-1][N-1] *= -1;
 
 		for (int i = 0; i < N; ++i ) for (int j = i + 1; j < N; ++j)
 		{
@@ -2989,9 +2991,9 @@ namespace leo
 
 	template<typename T>
 	void QRdecomposition<T>::decQR(matrix<T> B) 
-	{ 
-		//this -> Gram_Schmidt_procces(B); 
-		this -> Householder_transformation(B);
+	{
+		if (!B.is_square()) this -> Gram_Schmidt_procces(B);
+		else this -> Householder_transformation(B);
 	}
 
 
@@ -3003,7 +3005,7 @@ namespace leo
 namespace leo
 {
 	template<typename T>
-	vector<T> Eigenvalues(matrix<T> A, bool shift = true, double Error = 1e-2, int N_max = 100000)
+	vector<T> Eigenvalues(matrix<T> A, bool shift = true, double Error = 1e-5, int N_max = 100000)
 	{
 		int N = A.size_row();
 		QRdecomposition<T> qr(A);
@@ -3040,7 +3042,7 @@ namespace leo
 	}
 
 	template<typename T>
-	matrix<T> Eigenvectors(matrix<T> A, bool shift = true, bool lmShift = false, int N_max = 100000, double Error = 1e-2)
+	matrix<T> Eigenvectors(matrix<T> A, bool shift = true, bool lmShift = false, int N_max = 100000, double Error = 1e-5)
 	{
 		std::vector<T> lambda = Eigenvalues(A, shift);
 
@@ -3052,8 +3054,6 @@ namespace leo
 		
 		T MaxVal = *std::max_element(A.AllColumn().begin(), A.AllColumn().end());
 		T MinVal = *std::min_element(A.AllColumn().begin(), A.AllColumn().end());
-		//vector<T> X(n) = vector<T>::randomvector(n, MaxVal, MinVal);
-		 
 
 		std::vector<std::thread> t;
 		for (int i = 0; i < N; ++i) t.push_back( std::thread( [&Vecs, &lambda, &A, &E, &Error, &lmShift, &n, &MaxVal, &MinVal, N_max, i]
@@ -3078,7 +3078,13 @@ namespace leo
 
 				T error = (X_new - X_past).abs();
 
-				if (lmShift) T lm = lambda[i] + scalarmult(X_new, Y) / scalarmult(X_new, X_new);
+				if (lmShift) lm = scalarmult(X_new, A(X_new)) / (scalarmult(X_new, X_new) + 1e-15); //Noise!
+				/*{
+					T scm = scalarmult(X_new, X_new);
+				
+					if (scm < 1e-8)  lm = scalarmult(X_new, A(X_new)) / (scm + 1e-15); //Noise!
+					else lm = scalarmult(X_new, A(X_new)) / scm;
+				}*/
 
 				if (error < Error) break;
 
@@ -3092,10 +3098,28 @@ namespace leo
 
 
 		std::map<int, std::vector<int>> mp;
-		for (int i = 0; i < N; ++i) 
+
+		std::vector<std::pair<int, T>> sortlambda;
+		for (int i = 0; i < lambda.size(); ++i) sortlambda.push_back({i, lambda[i]});
+		std::sort(sortlambda.begin(), sortlambda.end(),
+				[] (std::pair<int, T> a, std::pair<int, T> b)
+				{ return a.second > b.second; } );
+
+		int count = 0;
+		for (int i = 0; i < N-1; ++i) 
 		{
-			int value = lambda[i] + 0.5;
-			mp[value].push_back(i);
+			T er = std::abs(sortlambda[i].second - sortlambda[i+1].second) / std::max({1.0, std::abs(sortlambda[i].second), std::abs(sortlambda[i+1].second)});
+
+			if (er <= 1e-12)
+			{
+				if (!mp.count(count)) 
+				{
+					mp[count].push_back(sortlambda[i + 1].first); 
+					mp[count].push_back(sortlambda[i].first);
+				}
+				else mp[count].push_back(sortlambda[i + 1].first);
+			}
+			else count++;
 		}
 
 		t.clear();
@@ -3107,14 +3131,16 @@ namespace leo
 			for (int i = 0; i < N_i; ++i) std::copy(Vecs.Column(it.second[i]).begin(), 
 								Vecs.Column(it.second[i]).end(), 
 								bais.Column(i).begin());
+		
 
 			QRdecomposition<T> qr(bais);
+			matrix<T> Q = qr.getQ();
 
-			for (int i = 0; i < N_i; ++i) std::copy(qr.getQ().Column(i).begin(), 
-								qr.getQ().Column(i).end(), 
+			for (int i = 0; i < N_i; ++i) std::copy(Q.Column(i).begin(), 
+								Q.Column(i).end(), 
 								Vecs.Column(it.second[i]).begin());
-			
 		}));
+
 		
 		for (int i = 0; i < t.size(); ++i) t[i].join();
 
@@ -3161,6 +3187,142 @@ namespace leo
 
 
 }
+
+
+//===============================================================================SVD_decomposition=========================================================================================
+
+namespace leo
+{
+	template<typename T>
+	class SVDdecomposition
+	{
+		private:
+			int m = 0;
+			int n = 0;
+			matrix<T> A;
+			matrix<T> U;
+			matrix<T> S;
+			matrix<T> V;
+		public:
+			SVDdecomposition(){};
+
+			void decSVD(matrix<T> B);
+
+			SVDdecomposition(matrix<T> B){ decSVD(B); };
+
+			matrix<T> getA(){ return A; }
+			matrix<T> getU(){ return U; }
+			matrix<T> getS(){ return S; }
+			matrix<T> getV(){ return V; }
+
+			SVDdecomposition<T> compress(int k);
+	};
+
+
+	template<typename T>
+	void SVDdecomposition<T>::decSVD(matrix<T> B)
+	{
+		this -> m = B.size_row();
+		this -> n = B.size_col();
+		int rank = std::min(m,n);
+		std::vector<std::thread> t;
+
+		this -> A = B;
+
+		matrix<T> AtA = B.transposition()(B);
+
+		struct sig { int first; T second; };
+
+		std::vector<sig> sortlambda;
+
+		t.push_back( std::thread([this, &AtA] {this -> V = Eigenvectors(AtA, true, true);}) );
+		t.push_back( std::thread([this, &AtA, &rank, &sortlambda] 
+		{
+			this -> S = matrix<T>(m,n);
+
+			vector<T> sigma = Eigenvalues(AtA);
+			for (int i = 0; i < sigma.size(); ++i) sortlambda.push_back({i, sigma[i] });			
+			for (int i = 0; i < rank; ++i) this -> S[i][i] = std::sqrt((sigma[i] >= 0 ? sigma[i] : 0));
+		}));
+	
+		for (int i = 0; i < t.size(); ++i) t[i].join();
+
+		std::sort(sortlambda.begin(), sortlambda.end(),
+			[] (sig a, sig b)
+			{ return a.second > b.second; } );
+
+		matrix<T> V_new = this -> V;
+		matrix<T> S_new = this -> S;
+
+		for (int i = 0; i < rank; ++i)
+		{
+			int num = sortlambda[i].first;
+			std::copy(V_new.Column(num).begin(), V_new.Column(num).end(), this -> V.Column(i).begin());
+			std::swap(this -> S[i][i], S_new[num][num]);
+		}
+
+		this -> U = A(V);
+
+		for (int i = 0; i < m; ++i) for (int j = 0; j < m; ++j)
+		{
+			this -> U[j][i] /= (this->S[i][i] > 0 ? this->S[i][i] : 1e-15); //Noise!
+		}
+		
+	}
+
+
+	//template<typename T>
+	//void SVDdecomposition<T>::decSVD(matrix<T> B){}
+
+
+
+	template<typename T>
+	SVDdecomposition<T> SVDdecomposition<T>::compress(int k)
+	{
+		if (!n || !m) throw std::invalid_argument("SVD decomposition ::compress: decomposition is empty! (No init)");
+		if (k > n || k > m) throw std::invalid_argument("SVD decomposition ::compress: size of compression more then rank of matrix!");
+
+		SVDdecomposition<T> svd = *this;
+		this -> U.resize(m, k);
+		this -> S.resize(k, k);
+		this -> V.resize(n, k);
+		this -> A = U(S(V.transposition()));
+
+		SVDdecomposition<T> svd_copy = *this;
+		this -> A = svd.getA();
+		this -> U = svd.getU();
+		this -> S = svd.getS();
+		this -> V = svd.getV();
+
+		return svd_copy;
+	}
+
+
+	template<typename T>
+	matrix<T> PCA(matrix<T> A, int k)
+	{
+		int N = A.size_col();
+		int n = A.size_row();
+		
+		for (int i = 0; i < N; ++i)
+		{
+			T sum = 0.0;
+			for (auto& it : A.Column(i)) sum += it;
+
+			sum /= n;
+			for (auto& it : A.Column(i)) it -= sum;
+		}
+
+		SVDdecomposition<T> svd(A);
+		matrix<T> V = svd.getV(); V.resize(N, k);
+
+		A = A(V);
+
+		return A;
+	}
+
+}
+
 
 
 //===============================================================================Solve_linal_methods=========================================================================================
@@ -3412,7 +3574,6 @@ std::vector<T> Regression<T>::predict(matrix<U1> X)
 
 
 }
-
 
 
 
